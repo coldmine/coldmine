@@ -35,8 +35,8 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 // initialDirScan scans _rootp_ directory. If the directory is not found,
 // it will created.
-// Max scan depth is 2. When child and grand child directory is not a
-// git directory. It will raise panic.
+// Max scan depth is 2. When child and grand child directory both are not
+// git directories, then it will raise panic.
 // That means it should one of following form.
 //
 //   repo/gitdir
