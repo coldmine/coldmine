@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -9,14 +10,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 )
 
 func main() {
-	gitDirs, err := initialDirScan("repo")
+	grps, err := dirScan("repo")
 	if err != nil {
 		log.Fatalf("initial scan failed: %v", err)
 	}
-	log.Printf("initial scan result: %v", gitDirs)
+	log.Print("initial scan result")
+	for _, g := range grps {
+		log.Print(g)
+	}
 	http.HandleFunc("/", rootHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -30,10 +35,23 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	t.Execute(w, nil)
+	grps, err := dirScan("repo")
+	if err != nil {
+		log.Fatalf("scan failed: %v", err)
+	}
+	t.Execute(w, grps)
 }
 
-// initialDirScan scans _rootp_ directory. If the directory is not found,
+type repoGroup struct {
+	Name  string
+	Repos []string
+}
+
+func (g *repoGroup) String() string {
+	return fmt.Sprintf("{Name:%v Repos:%v}", g.Name, g.Repos)
+}
+
+// dirScan scans _rootp_ directory. If the directory is not found,
 // it will created.
 // Max scan depth is 2. When child and grand child directory both are not
 // git directories, then it will raise panic.
@@ -42,12 +60,17 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 //   repo/gitdir
 //   repo/group/gitdir
 //
-func initialDirScan(rootp string) ([]string, error) {
+func dirScan(rootp string) ([]*repoGroup, error) {
 	err := os.Mkdir(rootp, 0755)
 	if err != nil && !os.IsExist(err) {
 		return nil, err
 	}
-	paths := make([]string, 0)
+
+	// map of repoGroups, will converted to sorted list eventually.
+	// no-grouped (_ng_) repositories are added as last item of the list.
+	grpMap := make(map[string]*repoGroup, 0)
+	ng := &repoGroup{Name: ""}
+
 	root, err := os.Open(rootp)
 	if err != nil {
 		return nil, err
@@ -62,9 +85,15 @@ func initialDirScan(rootp string) ([]string, error) {
 			return nil, errors.New("entry should a directory: " + dp)
 		}
 		if gitDir(dp) {
-			paths = append(paths, dp)
+			ng.Repos = append(ng.Repos, fi.Name())
 			continue
 		}
+
+		// the child is not a git dir.
+		// grand childs should be git directories.
+		g := &repoGroup{Name: fi.Name()}
+		grpMap[fi.Name()] = g
+
 		d, err := os.Open(dp)
 		if err != nil {
 			return nil, err
@@ -82,13 +111,32 @@ func initialDirScan(rootp string) ([]string, error) {
 				return nil, errors.New("entry should a directory: " + ddp)
 			}
 			if gitDir(ddp) {
-				paths = append(paths, ddp)
+				g.Repos = append(g.Repos, dfi.Name())
 				continue
 			}
 			return nil, errors.New("max depth reached, but not a git directory: " + ddp)
 		}
 	}
-	return paths, nil
+
+	// now we have map of repoGroup
+	// convert it to sorted list
+	keys := make([]string, 0)
+	for k := range grpMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	grps := make([]*repoGroup, len(grpMap))
+	for i, k := range keys {
+		grps[i] = grpMap[k]
+	}
+	grps = append(grps, ng)
+
+	// sort repoGroup.repos too.
+	for _, g := range grps {
+		sort.Strings(g.Repos)
+	}
+
+	return grps, nil
 }
 
 func gitDir(d string) bool {
