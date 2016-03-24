@@ -196,9 +196,9 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 func gitDir(d string) bool {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	cmd.Dir = d
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("git error: %v", err)
+		log.Fatalf("(%v) %s", err, out)
 	}
 	return string(out) == ".\n"
 }
@@ -217,8 +217,9 @@ func getInfoRefs(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		if s == "git-receive-pack" {
 			args = []string{"receive-pack", "--stateless-rpc", "--advertise-refs", repo}
 		}
-		out, err := exec.Command("git", args...).Output()
+		out, err := exec.Command("git", args...).CombinedOutput()
 		if err != nil {
+			log.Printf("(%v) %s", err, out)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
