@@ -18,6 +18,9 @@ import (
 	"time"
 )
 
+// TODO: command argument parse
+// TODO: template are must excuted at start of execution.
+
 const (
 	repoRoot = "repo"
 )
@@ -239,6 +242,9 @@ func serveRepo(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Printf("(%v) %s", err, out)
 	}
+
+	// TODO: git tree is consist of multiple files. parse them all.
+	// ex) tree -> tree -> blob
 	gitFiles := make([]string, 0)
 	for _, l := range strings.Split(string(out), "\n") {
 		if l != "" {
