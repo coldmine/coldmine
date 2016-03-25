@@ -208,6 +208,40 @@ func gitDir(d string) bool {
 	return string(out) == ".\n"
 }
 
+type Tree struct {
+	Repo  string
+	Id    string
+	Name  string
+	Trees []*Tree
+	Blobs []*Blob
+}
+
+func (t *Tree) String() string {
+	return fmt.Sprintf("tree: %v %v", t.Id[:8], t.Name)
+}
+
+type Blob struct {
+	Repo string
+	Id   string
+	Name string
+}
+
+func (b *Blob) String() string {
+	return fmt.Sprintf("blob: %v %v", b.Id[:8], b.Name)
+}
+
+// TODO: return error?
+func (b *Blob) Text() string {
+	cmd := exec.Command("git", "cat-file", "-p", b.Id)
+	cmd.Dir = b.Repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+		return ""
+	}
+	return string(out)
+}
+
 func serveRepo(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	branch := "master"
 
@@ -236,31 +270,73 @@ func serveRepo(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	}
 	tid := strings.Split(t, " ")[1]
 
-	cmd = exec.Command("git", "cat-file", "-p", string(tid))
-	cmd.Dir = repo
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-	}
-
-	// TODO: git tree is consist of multiple files. parse them all.
-	// ex) tree -> tree -> blob
-	gitFiles := make([]string, 0)
-	for _, l := range strings.Split(string(out), "\n") {
-		if l != "" {
-			gitFiles = append(gitFiles, strings.Split(l, "\t")[1])
-		}
-	}
+	top := parseTree(repo, tid, "")
 
 	b, err := ioutil.ReadFile("repo.html")
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl, err := template.New("repo").Parse(string(b))
+	// TODO: use template.Funcs?
+	fmap := template.FuncMap{
+		"reprTrees": reprTrees,
+	}
+	tmpl, err := template.New("repo").Funcs(fmap).Parse(string(b))
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl.Execute(w, gitFiles)
+	tmpl.Execute(w, top)
+}
+
+// parseTree parses tree hierarchy with given id and return a top tree.
+func parseTree(repo, id string, name string) *Tree {
+	top := &Tree{Repo: repo, Id: id, Name: name}
+
+	cmd := exec.Command("git", "cat-file", "-p", string(id))
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+	}
+	for _, l := range strings.Split(string(out), "\n") {
+		// the line looks like this.
+		// 100644 blob e6e777ec163436193a336a561cfbf57c3b06ccaa	README.md
+		// 100644 tree 8094086457b9e41a0c10ee3fef479056542da579	someDir
+		if l == "" {
+			// maybe last line.
+			continue
+		}
+		ll := strings.Split(l, "\t")
+		cinfos := strings.Split(ll[0], " ")
+		ctype := cinfos[1]
+		cid := cinfos[2]
+		cname := ll[1]
+		if ctype == "tree" {
+			top.Trees = append(top.Trees, parseTree(repo, cid, cname))
+		} else {
+			top.Blobs = append(top.Blobs, &Blob{Repo: repo, Id: cid, Name: cname})
+		}
+	}
+	return top
+}
+
+// treeEl holds information to draw each tree element.
+type treeEl struct {
+	Type   string // "dir" or "file".
+	Name   string
+	Margin int
+}
+
+// reprTrees used inside of repo.html as a function of template.
+func reprTrees(top *Tree, margin, incr int) []treeEl {
+	reprs := make([]treeEl, 0)
+	for _, t := range top.Trees {
+		reprs = append(reprs, treeEl{Type: "dir", Name: t.Name, Margin: margin})
+		reprs = append(reprs, reprTrees(t, margin+incr, incr)...)
+	}
+	for _, b := range top.Blobs {
+		reprs = append(reprs, treeEl{Type: "file", Name: b.Name, Margin: margin})
+	}
+	return reprs
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {

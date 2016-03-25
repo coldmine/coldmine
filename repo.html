@@ -14,9 +14,10 @@
 	</div>
 </div>
 <div>
-	{{range $}}
-		<div>{{.}}</div>
-	{{end}}
+<!-- TODO: make directories foldable. -->
+{{range reprTrees $ 0 20}}
+	<div class="treeEl {{.Type}}" style="margin-left:{{.Margin}}px">{{.Name}}</div>
+{{end}}
 </div>
 </body>
 </html>
