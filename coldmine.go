@@ -53,6 +53,8 @@ var services = []Service{
 
 	{"POST", regexp.MustCompile("/(.+)/git-upload-pack$"), serviceUpload},
 	{"POST", regexp.MustCompile("/(.+)/git-receive-pack$"), serviceReceive},
+
+	{"GET", regexp.MustCompile("/(.+)$"), serveRepo},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +203,58 @@ func gitDir(d string) bool {
 		log.Fatalf("(%v) %s", err, out)
 	}
 	return string(out) == ".\n"
+}
+
+func serveRepo(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	branch := "master"
+
+	cmd := exec.Command("git", "rev-parse", branch)
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	id := out[:len(out)-1] // strip "\n"
+
+	cmd = exec.Command("git", "cat-file", "-p", string(id))
+	cmd.Dir = repo
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+	}
+	// find tree object id
+	t := strings.Split(string(out), "\n")[0]
+	if !strings.HasPrefix(t, "tree ") {
+		log.Fatal(`commit object content not starts with "tree "`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	tid := strings.Split(t, " ")[1]
+
+	cmd = exec.Command("git", "cat-file", "-p", string(tid))
+	cmd.Dir = repo
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+	}
+	gitFiles := make([]string, 0)
+	for _, l := range strings.Split(string(out), "\n") {
+		if l != "" {
+			gitFiles = append(gitFiles, strings.Split(l, "\t")[1])
+		}
+	}
+
+	b, err := ioutil.ReadFile("repo.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	tmpl, err := template.New("repo").Parse(string(b))
+	if err != nil {
+		log.Fatal(err)
+	}
+	tmpl.Execute(w, gitFiles)
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {
