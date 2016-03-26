@@ -16,7 +16,13 @@
 <div>
 <!-- TODO: make directories foldable. -->
 {{range reprTrees $ 0 20}}
-	<div class="treeEl {{.Type}}" style="margin-left:{{.Margin}}px">{{.Name}}</div>
+	<div class="treeEl {{.Type}}" style="margin-left:{{.Margin}}px">
+		{{if eq .Type "dir"}}
+			{{.Name}}/
+		{{else}}
+			{{.Name}}
+		{{end}}
+		</div>
 {{end}}
 </div>
 </body>
