@@ -93,11 +93,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveRoot(w http.ResponseWriter, r *http.Request) {
-	b, err := ioutil.ReadFile("index.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	t, err := template.New("index").Parse(string(b))
+	t, err := template.ParseFiles("index.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -105,7 +101,17 @@ func serveRoot(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("scan failed: %v", err)
 	}
-	t.Execute(w, grps)
+	info := struct {
+		Repo       string
+		RepoGroups []*repoGroup
+	}{
+		Repo:       "",
+		RepoGroups: grps,
+	}
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 type repoGroup struct {
@@ -256,18 +262,13 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	b, err := ioutil.ReadFile("repo.html")
-	if err != nil {
-		log.Fatal(err)
-	}
 	fmap := template.FuncMap{
 		"reprTrees": reprTrees,
 	}
-	tmpl, err := template.New("repo").Funcs(fmap).Parse(string(b))
+	tmpl, err := template.New("repo.html").Funcs(fmap).ParseFiles("repo.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	info := struct {
 		Repo    string
 		TopTree *Tree
@@ -371,7 +372,7 @@ func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	t, err := template.ParseFiles("blob.html")
+	t, err := template.ParseFiles("blob.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}

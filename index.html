@@ -5,16 +5,9 @@
 	<title>Coldmine</title>
 </head>
 <body>
-<div id="top" style="background-color:#DDDDDD; padding:10px;">
-	<div style="display:inline-block; font-size:26px"><a href="/">Coldmine</a>/</div>
-	<div style="display:inline-block; width:400px; font-size:26px"></div>
-	<div style="float:right">
-		<button style="font-size:24px">Tree</button>
-		<button style="font-size:24px">Review</button>
-	</div>
-</div>
+{{template "top.html" .}}
 <div>
-	{{range $grp := $}}
+	{{range $grp := .RepoGroups}}
 		<div>{{.Name}}</div>
 		{{range .Repos}}
 			{{if eq $grp.Name ""}}
