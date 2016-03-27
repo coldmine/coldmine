@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"html/template"
 	"io"
@@ -18,14 +19,21 @@ import (
 	"time"
 )
 
-// TODO: command argument parse
 // TODO: template are must excuted at start of execution.
 
 const (
 	repoRoot = "repo"
 )
 
+var ipAddr string
+
+func init() {
+	flag.StringVar(&ipAddr, "ip", ":8080", "ip address")
+}
+
 func main() {
+	flag.Parse()
+
 	grps, err := dirScan(repoRoot)
 	if err != nil {
 		log.Fatalf("initial scan failed: %v", err)
@@ -35,7 +43,7 @@ func main() {
 		log.Print(g)
 	}
 	http.HandleFunc("/", rootHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(ipAddr, nil))
 }
 
 type Service struct {
