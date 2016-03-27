@@ -57,7 +57,7 @@ var services = []Service{
 	{"POST", regexp.MustCompile("/(.+)/git-upload-pack$"), serviceUpload},
 	{"POST", regexp.MustCompile("/(.+)/git-receive-pack$"), serviceReceive},
 
-	{"GET", regexp.MustCompile("/(.+)$"), serveRepo},
+	{"GET", regexp.MustCompile("/(.+)/tree/"), serveTree},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +78,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		s.serv(w, r, filepath.Join(repoRoot, repo), filepath.Join(repoRoot, r.URL.Path[1:]))
+		s.serv(w, r, repo, filepath.Join(repoRoot, r.URL.Path[1:]))
 		return
 	}
 
@@ -242,41 +242,17 @@ func (b *Blob) Text() string {
 	return string(out)
 }
 
-func serveRepo(w http.ResponseWriter, r *http.Request, repo, pth string) {
-	branch := "master"
-
-	cmd := exec.Command("git", "rev-parse", branch)
-	cmd.Dir = repo
-	out, err := cmd.CombinedOutput()
+func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	top, err := gitTree(repo, "master")
 	if err != nil {
-		log.Printf("(%v) %s", err, out)
+		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	id := out[:len(out)-1] // strip "\n"
-
-	cmd = exec.Command("git", "cat-file", "-p", string(id))
-	cmd.Dir = repo
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-	}
-	// find tree object id
-	t := strings.Split(string(out), "\n")[0]
-	if !strings.HasPrefix(t, "tree ") {
-		log.Fatal(`commit object content not starts with "tree "`)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	tid := strings.Split(t, " ")[1]
-
-	top := parseTree(repo, tid, "")
-
 	b, err := ioutil.ReadFile("repo.html")
 	if err != nil {
 		log.Fatal(err)
 	}
-	// TODO: use template.Funcs?
 	fmap := template.FuncMap{
 		"reprTrees": reprTrees,
 	}
@@ -284,7 +260,41 @@ func serveRepo(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tmpl.Execute(w, top)
+
+	info := struct {
+		Repo    string
+		TopTree *Tree
+	}{
+		Repo:    repo,
+		TopTree: top,
+	}
+	tmpl.Execute(w, info)
+}
+
+// gitTree returns top tree of the branch.
+func gitTree(repo, branch string) (*Tree, error) {
+	cmd := exec.Command("git", "rev-parse", branch)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("(%v) %s", err, out))
+	}
+	id := out[:len(out)-1] // strip "\n"
+
+	cmd = exec.Command("git", "cat-file", "-p", string(id))
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("(%v) %s", err, out))
+	}
+	// find tree object id
+	t := strings.Split(string(out), "\n")[0]
+	if !strings.HasPrefix(t, "tree ") {
+		return nil, errors.New(`commit object content not starts with "tree "`)
+	}
+	tid := strings.Split(t, " ")[1]
+
+	return parseTree(repo, tid, ""), nil
 }
 
 // parseTree parses tree hierarchy with given id and return a top tree.
@@ -292,7 +302,7 @@ func parseTree(repo, id string, name string) *Tree {
 	top := &Tree{Repo: repo, Id: id, Name: name}
 
 	cmd := exec.Command("git", "cat-file", "-p", string(id))
-	cmd.Dir = repo
+	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("(%v) %s", err, out)
@@ -322,6 +332,7 @@ func parseTree(repo, id string, name string) *Tree {
 // treeEl holds information to draw each tree element.
 type treeEl struct {
 	Type   string // "dir" or "file".
+	Id     string
 	Name   string
 	Margin int
 }
@@ -330,11 +341,11 @@ type treeEl struct {
 func reprTrees(top *Tree, margin, incr int) []treeEl {
 	reprs := make([]treeEl, 0)
 	for _, t := range top.Trees {
-		reprs = append(reprs, treeEl{Type: "dir", Name: t.Name, Margin: margin})
+		reprs = append(reprs, treeEl{Type: "dir", Id: t.Id, Name: t.Name, Margin: margin})
 		reprs = append(reprs, reprTrees(t, margin+incr, incr)...)
 	}
 	for _, b := range top.Blobs {
-		reprs = append(reprs, treeEl{Type: "file", Name: b.Name, Margin: margin})
+		reprs = append(reprs, treeEl{Type: "file", Id: b.Id, Name: b.Name, Margin: margin})
 	}
 	return reprs
 }
@@ -349,9 +360,9 @@ func getInfoRefs(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	s := r.Form.Get("service")
 	if s == "git-upload-pack" || s == "git-receive-pack" {
 		// smart protocol
-		args := []string{"upload-pack", "--stateless-rpc", "--advertise-refs", repo}
+		args := []string{"upload-pack", "--stateless-rpc", "--advertise-refs", filepath.Join(repoRoot, repo)}
 		if s == "git-receive-pack" {
-			args = []string{"receive-pack", "--stateless-rpc", "--advertise-refs", repo}
+			args = []string{"receive-pack", "--stateless-rpc", "--advertise-refs", filepath.Join(repoRoot, repo)}
 		}
 		out, err := exec.Command("git", args...).CombinedOutput()
 		if err != nil {
@@ -420,7 +431,7 @@ func serviceReceive(w http.ResponseWriter, r *http.Request, repo, pth string) {
 func service(w http.ResponseWriter, r *http.Request, s, repo, pth string) {
 	w.Header().Set("Content-Type", "application/x-git-"+s+"-result")
 
-	cmd := exec.Command("git", s, "--stateless-rpc", repo)
+	cmd := exec.Command("git", s, "--stateless-rpc", filepath.Join(repoRoot, repo))
 
 	in, err := cmd.StdinPipe()
 	if err != nil {
