@@ -21,14 +21,12 @@ import (
 
 // TODO: template are must excuted at start of execution.
 
-const (
-	repoRoot = "repo"
-)
-
 var ipAddr string
+var repoRoot string
 
 func init() {
 	flag.StringVar(&ipAddr, "ip", ":8080", "ip address")
+	flag.StringVar(&repoRoot, "repo", "repo", "repository root directory")
 }
 
 func main() {
