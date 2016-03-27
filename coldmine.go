@@ -58,6 +58,7 @@ var services = []Service{
 	{"POST", regexp.MustCompile("/(.+)/git-receive-pack$"), serviceReceive},
 
 	{"GET", regexp.MustCompile("/(.+)/tree/"), serveTree},
+	{"GET", regexp.MustCompile("/(.+)/blob/"), serveBlob},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -348,6 +349,50 @@ func reprTrees(top *Tree, margin, incr int) []treeEl {
 		reprs = append(reprs, treeEl{Type: "file", Id: b.Id, Name: b.Name, Margin: margin})
 	}
 	return reprs
+}
+
+func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	pp := strings.Split(pth, "/")
+	if pp[len(pp)-2] != "blob" {
+		log.Print("invalid blob address")
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	b := pp[len(pp)-1]
+	c, err := blobContent(repo, b)
+	if err != nil {
+		log.Print(err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	t, err := template.ParseFiles("blob.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	info := struct {
+		Repo    string
+		Content string
+	}{
+		Repo:    repo,
+		Content: string(c),
+	}
+	t.Execute(w, info)
+}
+
+func blobContent(repo, b string) ([]byte, error) {
+	cmd := exec.Command("git", "cat-file", "-t", b)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("(%v) %s", err, out)
+	}
+	if string(out) != "blob\n" {
+		return nil, fmt.Errorf("repo '%v' don't have blob '%v'", repo, b)
+	}
+	cmd = exec.Command("git", "cat-file", "-p", b)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	c, _ := cmd.Output()
+	return c, nil
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {
