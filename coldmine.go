@@ -347,12 +347,12 @@ type treeEl struct {
 // reprTrees used inside of repo.html as a function of template.
 func reprTrees(top *Tree, margin, incr int) []treeEl {
 	reprs := make([]treeEl, 0)
+	for _, b := range top.Blobs {
+		reprs = append(reprs, treeEl{Type: "file", Id: b.Id, Name: b.Name, Margin: margin})
+	}
 	for _, t := range top.Trees {
 		reprs = append(reprs, treeEl{Type: "dir", Id: t.Id, Name: t.Name, Margin: margin})
 		reprs = append(reprs, reprTrees(t, margin+incr, incr)...)
-	}
-	for _, b := range top.Blobs {
-		reprs = append(reprs, treeEl{Type: "file", Id: b.Id, Name: b.Name, Margin: margin})
 	}
 	return reprs
 }
