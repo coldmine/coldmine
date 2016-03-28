@@ -40,6 +40,7 @@ func main() {
 	for _, g := range grps {
 		log.Print(g)
 	}
+	http.HandleFunc("/action", actionHandler)
 	http.HandleFunc("/", rootHandler)
 	log.Fatal(http.ListenAndServe(ipAddr, nil))
 }
@@ -90,6 +91,33 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusForbidden)
+}
+
+func actionHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	add := r.Form.Get("addRepo")
+	if add != "" {
+		log.Printf("add repo: %v", add)
+		err := addRepo(add)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(fmt.Sprintf("%v", err)))
+			return
+		}
+	}
+	rm := r.Form.Get("removeRepo")
+	if rm != "" {
+		log.Printf("remove repo: %v", rm)
+		err := removeRepo(rm)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(fmt.Sprintf("%v", err)))
+			return
+		}
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func serveRoot(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +237,57 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 	}
 
 	return grps, nil
+}
+
+func addRepo(repo string) error {
+	if repo == "" {
+		return errors.New("no repository name given.")
+	}
+	if strings.HasPrefix(repo, "/") {
+		return errors.New("no permission for that!")
+	}
+	if len(strings.Split(repo, "/")) > 3 {
+		return fmt.Errorf("repository path too deep: %v", repo)
+	}
+	d := filepath.Join(repoRoot, repo)
+	_, err := os.Stat(d)
+	if err == nil {
+		return fmt.Errorf("repository already exist: %v", repo)
+	}
+	err = os.MkdirAll(d, 0755)
+	if err != nil {
+		return fmt.Errorf("couldn't make repository: %v: %v", repo, err)
+	}
+	cmd := exec.Command("git", "init", "--bare")
+	cmd.Dir = d
+	out, err := cmd.Output()
+	if err != nil {
+		// TODO: die directly? because it make program terminated eventually.
+		return fmt.Errorf("repository initialzation failed: (%v) %v", err, string(out))
+	}
+	return nil
+}
+
+func removeRepo(repo string) error {
+	if repo == "" {
+		return errors.New("no repository name given.")
+	}
+	if strings.HasPrefix(repo, "/") {
+		return errors.New("no permission for that!")
+	}
+	if len(strings.Split(repo, "/")) > 3 {
+		return fmt.Errorf("repository path too deep: %v", repo)
+	}
+	d := filepath.Join(repoRoot, repo)
+	_, err := os.Stat(d)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("repository not exist: %v", repo)
+	}
+	err = os.RemoveAll(d)
+	if err != nil {
+		return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
+	}
+	return nil
 }
 
 func gitDir(d string) bool {

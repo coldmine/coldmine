@@ -6,6 +6,19 @@
 </head>
 <body>
 {{template "top.html" .}}
+<div style="margin-bottom:10px;">
+	<div>
+		<button onclick="showAddForm()">add</button>
+		<button onclick="showRemoveForm()">remove</button>
+		<button onclick="hideForms()">cancel</button>
+	</div>
+	<form id="confirm-add" action="/action" method="post" style="display:none">
+		Add repository: <input type="text" name="addRepo" /> <input type="submit" value="ok" />
+	</form>
+	<form id="confirm-remove" action="/action" method="post" style="display:none">
+		Remove repository: <input type="text" name="removeRepo" /> <input type="submit" value="ok" />
+	</form>
+</div>
 <div>
 	{{range $grp := .RepoGroups}}
 		<div>{{.Name}}</div>
@@ -19,5 +32,21 @@
 		<div style="height:10px"></div>
 	{{end}}
 </div>
+
+<script>
+function showAddForm() {
+	document.getElementById("confirm-remove").style.display = "none";
+	document.getElementById("confirm-add").style.display = "block";
+}
+function showRemoveForm() {
+	document.getElementById("confirm-add").style.display = "none";
+	document.getElementById("confirm-remove").style.display = "block";
+}
+function hideForms() {
+	document.getElementById("confirm-add").style.display = "none";
+	document.getElementById("confirm-remove").style.display = "none";
+}
+</script>
+
 </body>
 </html>
