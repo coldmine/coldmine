@@ -275,28 +275,54 @@ func removeRepo(repo string) error {
 	if strings.HasPrefix(repo, "/") {
 		return errors.New("no permission for that!")
 	}
-	if len(strings.Split(repo, "/")) > 3 {
-		return fmt.Errorf("repository path too deep: %v", repo)
-	}
+
 	d := filepath.Join(repoRoot, repo)
 	df, err := os.Open(d)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("repository not exist: %v", repo)
 	}
-	if len(strings.Split(repo, "/")) == 1 {
-		// if the directory has sub directory, then it's repository group.
-		// then it should not deleted if any sub repository is exist.
+	defer df.Close()
+
+	rr := strings.Split(repo, "/")
+	if len(rr) > 3 {
+		return fmt.Errorf("repository path too deep: %v", repo)
+	}
+	if len(rr) == 1 {
+		// if the directory has sub directory, then
+		// it's repository group and should not deleted.
 		fi, err := df.Readdir(1)
 		if err != nil {
 			return fmt.Errorf("couldn't read dir: %v", err)
 		}
 		if len(fi) == 1 {
-			return fmt.Errorf("the group has child repository: %v", repo)
+			return fmt.Errorf("group has child repository: %v", repo)
 		}
 	}
+
 	err = os.RemoveAll(d)
 	if err != nil {
 		return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
+	}
+
+	if len(rr) == 2 {
+		// after remove sub directory of group, check group directory.
+		// if no sub directory exist in group, remove it together.
+		pd := filepath.Join(repoRoot, rr[0])
+		pdf, err := os.Open(pd)
+		if err != nil {
+			return err
+		}
+		defer pdf.Close()
+		fi, err := pdf.Readdir(-1)
+		if err != nil {
+			return fmt.Errorf("couldn't read dir: %v", err)
+		}
+		if len(fi) == 0 {
+			err = os.Remove(pd)
+			if err != nil {
+				return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
+			}
+		}
 	}
 	return nil
 }
