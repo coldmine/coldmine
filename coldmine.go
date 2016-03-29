@@ -23,10 +23,27 @@ import (
 
 var ipAddr string
 var repoRoot string
+var password string
 
 func init() {
 	flag.StringVar(&ipAddr, "ip", ":8080", "ip address")
 	flag.StringVar(&repoRoot, "repo", "repo", "repository root directory")
+
+	b, err := ioutil.ReadFile("password")
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("please make 'password' file with your password.")
+			os.Exit(1)
+		} else {
+			fmt.Printf("open password error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	password = strings.Split(string(b), "\n")[0]
+	if password == "" {
+		fmt.Println("password file should not empty (need password).")
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -95,6 +112,11 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 func actionHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
+
+	if r.Form.Get("password") != password {
+		http.Error(w, "password not matched", http.StatusForbidden)
+	}
+
 	add := r.Form.Get("addRepo")
 	if add != "" {
 		log.Printf("add repo: %v", add)
