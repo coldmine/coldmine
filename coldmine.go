@@ -279,9 +279,20 @@ func removeRepo(repo string) error {
 		return fmt.Errorf("repository path too deep: %v", repo)
 	}
 	d := filepath.Join(repoRoot, repo)
-	_, err := os.Stat(d)
+	df, err := os.Open(d)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("repository not exist: %v", repo)
+	}
+	if len(strings.Split(repo, "/")) == 1 {
+		// if the directory has sub directory, then it's repository group.
+		// then it should not deleted if any sub repository is exist.
+		fi, err := df.Readdir(1)
+		if err != nil {
+			return fmt.Errorf("couldn't read dir: %v", err)
+		}
+		if len(fi) == 1 {
+			return fmt.Errorf("the group has child repository: %v", repo)
+		}
 	}
 	err = os.RemoveAll(d)
 	if err != nil {
