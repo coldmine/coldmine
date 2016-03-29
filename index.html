@@ -13,10 +13,10 @@
 		<button onclick="hideForms()">cancel</button>
 	</div>
 	<form id="confirm-add" action="/action" method="post" style="display:none">
-		Add repository: <input type="text" name="addRepo" /> <input type="submit" value="ok" />
+		Add repository: <input id="add-input" type="text" name="addRepo" /> <input type="submit" value="ok" />
 	</form>
 	<form id="confirm-remove" action="/action" method="post" style="display:none">
-		Remove repository: <input type="text" name="removeRepo" /> <input type="submit" value="ok" />
+		Remove repository: <input id="remove-input" type="text" name="removeRepo" /> <input type="submit" value="ok" />
 	</form>
 </div>
 <div>
@@ -37,10 +37,12 @@
 function showAddForm() {
 	document.getElementById("confirm-remove").style.display = "none";
 	document.getElementById("confirm-add").style.display = "block";
+	document.getElementById("add-input").focus();
 }
 function showRemoveForm() {
 	document.getElementById("confirm-add").style.display = "none";
 	document.getElementById("confirm-remove").style.display = "block";
+	document.getElementById("remove-input").focus();
 }
 function hideForms() {
 	document.getElementById("confirm-add").style.display = "none";
