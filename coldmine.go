@@ -317,7 +317,7 @@ func removeRepo(repo string) error {
 		if err != nil {
 			return fmt.Errorf("couldn't read dir: %v", err)
 		}
-		if len(fi) == 1 && gitDir(filepath.Join(d, fi[0].Name())) {
+		if len(fi) != 0 && fi[0].IsDir() && gitDir(filepath.Join(d, fi[0].Name())) {
 			return fmt.Errorf("group has child repository: %v", repo)
 		}
 	}
