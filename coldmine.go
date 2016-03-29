@@ -115,6 +115,7 @@ func actionHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Form.Get("password") != password {
 		http.Error(w, "password not matched", http.StatusForbidden)
+		return
 	}
 
 	add := r.Form.Get("addRepo")
