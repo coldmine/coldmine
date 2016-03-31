@@ -404,7 +404,7 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	fmap := template.FuncMap{
 		"reprTrees": reprTrees,
 	}
-	tmpl, err := template.New("repo.html").Funcs(fmap).ParseFiles("repo.html", "top.html")
+	tmpl, err := template.New("tree.html").Funcs(fmap).ParseFiles("tree.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
