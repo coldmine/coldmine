@@ -24,7 +24,7 @@
 		<div>{{.Name}}</div>
 		{{range .Repos}}
 			{{if eq $grp.Name ""}}
-				<div><a href="/{{.}}/tree/">{{.}}</a></div>
+				<div><a href="/{{.}}/overview/">{{.}}</a></div>
 			{{else}}
 				<div style="margin-left:20px"><a href="/{{$grp.Name}}/{{.}}/tree/">{{.}}</a></div>
 			{{end}}

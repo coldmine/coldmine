@@ -81,6 +81,7 @@ var services = []Service{
 	{"POST", regexp.MustCompile("/(.+)/git-upload-pack$"), serviceUpload},
 	{"POST", regexp.MustCompile("/(.+)/git-receive-pack$"), serviceReceive},
 
+	{"GET", regexp.MustCompile("/(.+)/overview/"), serveOverview},
 	{"GET", regexp.MustCompile("/(.+)/tree/"), serveTree},
 	{"GET", regexp.MustCompile("/(.+)/blob/"), serveBlob},
 }
@@ -348,6 +349,81 @@ func removeRepo(repo string) error {
 		}
 	}
 	return nil
+}
+
+func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	cmd := exec.Command("git", "branch")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	lines := strings.Split(string(out), "\n")
+	lines = lines[:len(lines)-1]
+	branches := make([]string, 0, len(lines))
+	for _, l := range lines {
+		branches = append(branches, strings.Trim(l, " \r"))
+	}
+
+	cmd = exec.Command("git", "rev-list", "--count", "master")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	nc := string(out)
+	nc = nc[:len(nc)-1]
+	nCommits, err := strconv.Atoi(nc)
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	cmd = exec.Command("git", "log", "--pretty=oneline", "-10", "master")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	recentCommits := make([]commitEl, 0, 10)
+	for _, c := range strings.Split(string(out), "\n") {
+		if c == "" {
+			break
+		}
+		cc := strings.SplitN(c, " ", 2)
+		recentCommits = append(recentCommits, commitEl{ID: cc[0], Title: cc[1]})
+	}
+	info := struct {
+		Repo          string
+		Branches      []string
+		NCommits      int
+		RecentCommits []commitEl
+	}{
+		Repo:          repo,
+		Branches:      branches,
+		NCommits:      nCommits,
+		RecentCommits: recentCommits,
+	}
+	t, err := template.ParseFiles("overview.html", "top.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+type commitEl struct {
+	ID    string
+	Title string
 }
 
 func gitDir(d string) bool {
