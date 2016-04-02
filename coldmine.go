@@ -400,16 +400,27 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		cc := strings.SplitN(c, " ", 2)
 		recentCommits = append(recentCommits, commitEl{ID: cc[0], Title: cc[1]})
 	}
+
+	top, err := gitTree(repo, "master")
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	nFiles := nFilesInTree(top)
+
 	info := struct {
 		Repo          string
 		Branches      []string
 		NCommits      int
 		RecentCommits []commitEl
+		NFiles        int
 	}{
 		Repo:          repo,
 		Branches:      branches,
 		NCommits:      nCommits,
 		RecentCommits: recentCommits,
+		NFiles:        nFiles,
 	}
 	t, err := template.ParseFiles("overview.html", "top.html")
 	if err != nil {
@@ -419,6 +430,14 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func nFilesInTree(t *Tree) int {
+	n := len(t.Blobs)
+	for _, tt := range t.Trees {
+		n += nFilesInTree(tt)
+	}
+	return n
 }
 
 type commitEl struct {
