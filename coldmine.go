@@ -84,6 +84,7 @@ var services = []Service{
 	{"GET", regexp.MustCompile("/(.+)/overview/"), serveOverview},
 	{"GET", regexp.MustCompile("/(.+)/tree/"), serveTree},
 	{"GET", regexp.MustCompile("/(.+)/blob/"), serveBlob},
+	{"GET", regexp.MustCompile("/(.+)/commit/"), serveCommit},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -438,6 +439,35 @@ func nFilesInTree(t *Tree) int {
 		n += nFilesInTree(tt)
 	}
 	return n
+}
+
+func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	pp := strings.Split(pth, "/")
+	if pp[len(pp)-2] != "commit" {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
+	commit := pp[len(pp)-1]
+	cmd := exec.Command("git", "show", commit)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("(%v) %s", err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	t, err := template.ParseFiles("commit.html", "top.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	info := struct {
+		Repo    string
+		Content string
+	}{
+		Repo:    repo,
+		Content: string(out),
+	}
+	t.Execute(w, info)
 }
 
 type commitEl struct {
