@@ -9,11 +9,11 @@
 <pre>
 {{range .Contents -}}
 	{{- if hasPrefix . "+" -}}
-		<div style="color:green">{{.}}</div>
+		<span style="color:green">{{.}}</span>
 	{{- else if hasPrefix . "-" -}}
-		<div style="color:red">{{.}}</div>
+		<span style="color:red">{{.}}</span>
 	{{- else -}}
-		<div>{{.}}</div>
+		<span>{{.}}</span>
 	{{- end -}}
 {{- end}}
 </pre>

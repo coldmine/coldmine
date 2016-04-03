@@ -462,7 +462,7 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Contents []string
 	}{
 		Repo:     repo,
-		Contents: strings.Split(string(out), "\n"),
+		Contents: strings.SplitAfter(string(out), "\n"),
 	}
 	fmap := template.FuncMap{
 		"hasPrefix": strings.HasPrefix,
