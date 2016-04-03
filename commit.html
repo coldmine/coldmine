@@ -6,6 +6,16 @@
 </head>
 <body>
 {{template "top.html" .}}
-<pre>{{.Content}}</pre>
+<pre>
+{{range .Contents -}}
+	{{- if hasPrefix . "+" -}}
+		<div style="color:green">{{.}}</div>
+	{{- else if hasPrefix . "-" -}}
+		<div style="color:red">{{.}}</div>
+	{{- else -}}
+		<div>{{.}}</div>
+	{{- end -}}
+{{- end}}
+</pre>
 </body>
 </html>

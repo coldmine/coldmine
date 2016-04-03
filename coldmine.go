@@ -457,18 +457,24 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	t, err := template.ParseFiles("commit.html", "top.html")
+	info := struct {
+		Repo     string
+		Contents []string
+	}{
+		Repo:     repo,
+		Contents: strings.Split(string(out), "\n"),
+	}
+	fmap := template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+	}
+	t, err := template.New("commit.html").Funcs(fmap).ParseFiles("commit.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
-	info := struct {
-		Repo    string
-		Content string
-	}{
-		Repo:    repo,
-		Content: string(out),
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Fatal(err)
 	}
-	t.Execute(w, info)
 }
 
 type commitEl struct {
