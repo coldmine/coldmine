@@ -85,6 +85,7 @@ var services = []Service{
 	{"GET", regexp.MustCompile("/(.+)/tree/"), serveTree},
 	{"GET", regexp.MustCompile("/(.+)/blob/"), serveBlob},
 	{"GET", regexp.MustCompile("/(.+)/commit/"), serveCommit},
+	{"GET", regexp.MustCompile("/(.+)/log/"), serveLog},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -664,6 +665,29 @@ func blobContent(repo, b string) ([]byte, error) {
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	c, _ := cmd.Output()
 	return c, nil
+}
+
+func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	cmd := exec.Command("git", "log", "--full-diff")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	info := struct {
+		Repo    string
+		Content string
+	}{
+		Repo:    repo,
+		Content: string(out),
+	}
+	t, err := template.ParseFiles("log.html", "top.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	t.Execute(w, info)
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {

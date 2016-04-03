@@ -7,7 +7,7 @@
 <body>
 {{template "top.html" .}}
 <div style="font-size:20px">Branches: {{range .Branches}}{{.}} {{end}}</div><br>
-<div style="font-size:20px">Total {{.NCommits}} Commits</div></br>
+<div style="font-size:20px"><a href="/{{$.Repo}}/log/">Total {{.NCommits}} Commits</a></div></br>
 <div style="font-size:20px">Recent Commits</div>
 <div style="margin-left:10px">
 	{{range .RecentCommits}}
