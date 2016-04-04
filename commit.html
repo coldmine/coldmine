@@ -8,7 +8,10 @@
 {{template "top.html" .}}
 <pre>
 {{range .Contents -}}
-	{{- if hasPrefix . "+" -}}
+	{{- if hasPrefix . "tree: " -}}
+		<span>tree: <a href="/{{$.Repo}}/tree/{{pickID .}}">{{pickID .}}</a>
+</span>
+	{{- else if hasPrefix . "+" -}}
 		<span style="color:green">{{.}}</span>
 	{{- else if hasPrefix . "-" -}}
 		<span style="color:red">{{.}}</span>
