@@ -535,6 +535,7 @@ func (b *Blob) Text() string {
 }
 
 func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	// TODO: get tree id from _pth_. show the tree.
 	top, err := gitTree(repo, "master")
 	if err != nil {
 		log.Print(err)
