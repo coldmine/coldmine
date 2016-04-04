@@ -6,6 +6,9 @@
 </head>
 <body>
 {{template "top.html" .}}
-<pre>{{.Content}}</pre>
+<pre>
+{{range .Logs -}}<div style="display:inline-block; height:28px;"><span style="color:#444444">{{printf "%13s" .Date}}</span> <a href="/{{$.Repo}}/commit/{{.ID}}">{{.Subject}}</a></div>
+{{end}}
+</pre>
 </body>
 </html>

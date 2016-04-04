@@ -682,7 +682,7 @@ func blobContent(repo, b string) ([]byte, error) {
 }
 
 func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
-	cmd := exec.Command("git", "log", "--full-diff")
+	cmd := exec.Command("git", "log", "--pretty=format:%H%n%ar%n%s%n")
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -690,18 +690,30 @@ func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	logs := make([]logEl, 0)
+	for _, c := range strings.Split(string(out), "\n\n") {
+		cc := strings.Split(c, "\n")
+		simpleDate := strings.Join(strings.Split(strings.Replace(cc[1], ",", "", -1), " ")[:2], " ") + " ago"
+		logs = append(logs, logEl{ID: cc[0], Date: simpleDate, Subject: cc[2]})
+	}
 	info := struct {
-		Repo    string
-		Content string
+		Repo string
+		Logs []logEl
 	}{
-		Repo:    repo,
-		Content: string(out),
+		Repo: repo,
+		Logs: logs,
 	}
 	t, err := template.ParseFiles("log.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
 	t.Execute(w, info)
+}
+
+type logEl struct {
+	ID      string
+	Date    string
+	Subject string
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {
