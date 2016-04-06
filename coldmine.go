@@ -81,7 +81,7 @@ var services = []Service{
 	{"POST", regexp.MustCompile("/git-upload-pack$"), serviceUpload},
 	{"POST", regexp.MustCompile("/git-receive-pack$"), serviceReceive},
 
-	{"GET", regexp.MustCompile("/overview/"), serveOverview},
+	{"GET", regexp.MustCompile("/$"), serveOverview},
 	{"GET", regexp.MustCompile("/tree/"), serveTree},
 	{"GET", regexp.MustCompile("/blob/"), serveBlob},
 	{"GET", regexp.MustCompile("/commit/"), serveCommit},
