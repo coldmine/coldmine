@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Coldmine</title>
+</head>
+<body>
+{{template "top.html" .}}
+<div style="font-size:20px">
+This repo has no history yet.<br>
+You need push commit(s) to activate this repo.<br>
+<br>
+<span style="background-color:#BBBBBB; padding:10px">
+	git remote add origin http://{{.IP}}/{{.Repo}}
+</span>
+</div>
+</body>
+</html>

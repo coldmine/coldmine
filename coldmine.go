@@ -383,6 +383,38 @@ func removeRepo(repo string) error {
 	return nil
 }
 
+func serveInit(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	var newIPAddr string
+	ip := strings.Split(ipAddr, ":")
+	if len(ip) == 1 {
+		if ip[0] == "" {
+			newIPAddr = "localhost"
+		} else {
+			newIPAddr = ipAddr
+		}
+	} else {
+		if ip[0] == "" {
+			ip[0] = "localhost"
+		}
+		newIPAddr = strings.Join(ip, ":")
+	}
+	info := struct {
+		Repo string
+		IP   string
+	}{
+		Repo: repo,
+		IP:   newIPAddr,
+	}
+	t, err := template.ParseFiles("init.html", "top.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	cmd := exec.Command("git", "branch")
 	cmd.Dir = filepath.Join(repoRoot, repo)
@@ -390,6 +422,11 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Printf("(%v) %s", err, out)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if string(out) == "" {
+		// repository not initialized yet.
+		serveInit(w, r, repo, pth)
 		return
 	}
 	lines := strings.Split(string(out), "\n")
