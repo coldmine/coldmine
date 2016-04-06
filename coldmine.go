@@ -478,18 +478,37 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	}
 	nFiles := nFilesInTree(top)
 
+	hasReadme := false
+	readme := ""
+	for _, blob := range top.Blobs {
+		if blob.Name == "README" {
+			hasReadme = true
+			b, err := blobContent(repo, blob.Id)
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			readme = string(b)
+			break
+		}
+	}
+
 	info := struct {
 		Repo          string
 		Branches      []string
 		NCommits      int
 		RecentCommits []commitEl
 		NFiles        int
+		HasReadme     bool
+		Readme        string
 	}{
 		Repo:          repo,
 		Branches:      branches,
 		NCommits:      nCommits,
 		RecentCommits: recentCommits,
 		NFiles:        nFiles,
+		HasReadme:     hasReadme,
+		Readme:        readme,
 	}
 	t, err := template.ParseFiles("overview.html", "top.html")
 	if err != nil {

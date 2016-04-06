@@ -16,6 +16,14 @@
 	</div>
 	{{end}}
 </div><br>
-<div style="font-size:20px"><a href="/{{$.Repo}}/tree/">{{.NFiles}} Files</a></div>
+<div style="font-size:20px"><a href="/{{$.Repo}}/tree/">{{.NFiles}} Files</a></div><br><br>
+
+{{if not .HasReadme}}
+	<div style="font-size:20px; margin-bottom:10px;">{{.Repo}} repository don't have README file</div>
+{{else}}
+	<div style="font-size:20px; margin-bottom:10px;">README</div>
+	<div style="width:800px; background-color:#CCCCCC; padding:10px">{{.Readme}}</div>
+{{end}}
+
 </body>
 </html>
