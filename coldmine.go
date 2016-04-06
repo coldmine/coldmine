@@ -576,11 +576,17 @@ type commitEl struct {
 	Title string
 }
 
+// gitDir checks whether the _d_ is git directory, or not.
+// if not found the path, it will return false.
+// any other error makes it fatal.
 func gitDir(d string) bool {
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	cmd.Dir = d
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
 		log.Fatalf("(%v) %s", err, out)
 	}
 	return string(out) == ".\n"
