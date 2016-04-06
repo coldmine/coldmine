@@ -69,23 +69,23 @@ type Service struct {
 }
 
 var services = []Service{
-	{"GET", regexp.MustCompile("/HEAD$"), getHead},
-	{"GET", regexp.MustCompile("/info/refs$"), getInfoRefs},
-	{"GET", regexp.MustCompile("/objects/info/alternates$"), getTextFile},
-	{"GET", regexp.MustCompile("/objects/info/http-alternates$"), getTextFile},
-	{"GET", regexp.MustCompile("/objects/info/packs$"), getInfoPacks},
-	{"GET", regexp.MustCompile("/objects/[0-9a-f]{2}/[0-9a-f]{38}$"), getLooseObject},
-	{"GET", regexp.MustCompile("/objects/pack/pack-[0-9a-f]{40}\\.pack$"), getPackFile},
-	{"GET", regexp.MustCompile("/objects/pack/pack-[0-9a-f]{40}\\.idx$"), getIdxFile},
+	{"GET", regexp.MustCompile("^/HEAD$"), getHead},
+	{"GET", regexp.MustCompile("^/info/refs$"), getInfoRefs},
+	{"GET", regexp.MustCompile("^/objects/info/alternates$"), getTextFile},
+	{"GET", regexp.MustCompile("^/objects/info/http-alternates$"), getTextFile},
+	{"GET", regexp.MustCompile("^/objects/info/packs$"), getInfoPacks},
+	{"GET", regexp.MustCompile("^/objects/[0-9a-f]{2}/[0-9a-f]{38}$"), getLooseObject},
+	{"GET", regexp.MustCompile("^/objects/pack/pack-[0-9a-f]{40}\\.pack$"), getPackFile},
+	{"GET", regexp.MustCompile("^/objects/pack/pack-[0-9a-f]{40}\\.idx$"), getIdxFile},
 
-	{"POST", regexp.MustCompile("/git-upload-pack$"), serviceUpload},
-	{"POST", regexp.MustCompile("/git-receive-pack$"), serviceReceive},
+	{"POST", regexp.MustCompile("^/git-upload-pack$"), serviceUpload},
+	{"POST", regexp.MustCompile("^/git-receive-pack$"), serviceReceive},
 
-	{"GET", regexp.MustCompile("/$"), serveOverview},
-	{"GET", regexp.MustCompile("/tree/"), serveTree},
-	{"GET", regexp.MustCompile("/blob/"), serveBlob},
-	{"GET", regexp.MustCompile("/commit/"), serveCommit},
-	{"GET", regexp.MustCompile("/log/"), serveLog},
+	{"GET", regexp.MustCompile("^/$"), serveOverview},
+	{"GET", regexp.MustCompile("^/tree/"), serveTree},
+	{"GET", regexp.MustCompile("^/blob/"), serveBlob},
+	{"GET", regexp.MustCompile("^/commit/"), serveCommit},
+	{"GET", regexp.MustCompile("^/log/"), serveLog},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
