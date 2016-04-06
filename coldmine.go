@@ -775,7 +775,10 @@ func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	t.Execute(w, info)
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type logEl struct {
