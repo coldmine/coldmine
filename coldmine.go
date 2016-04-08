@@ -587,7 +587,9 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	}
 	fmap := template.FuncMap{
 		"hasPrefix": strings.HasPrefix,
-		"pickID":    pickID,
+		"pickID": func(l string) string {
+			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
+		},
 	}
 	t, err := template.New("commit.html").Funcs(fmap).ParseFiles("commit.html", "top.html")
 	if err != nil {
@@ -597,13 +599,6 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// pickID returns object id from "x: <id of x>\n" string.
-// it used inside commit.html template.
-func pickID(l string) string {
-	ll := strings.Split(l, " ")
-	return strings.TrimRight(ll[1], "\n")
 }
 
 type commitEl struct {
