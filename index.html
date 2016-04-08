@@ -26,7 +26,7 @@
 			{{if eq $grp.Name ""}}
 				<div style="font-size:20px; margin:5px"><a href="/{{.Name}}/">{{.Name}}</a> <span style="font-size:13px; color:gray">{{.Updated}}</span></div>
 			{{else}}
-				<div style="margin-left:20px; font-size:20px; margin:5px"><a href="/{{$grp.Name}}/{{.Name}}/">{{.}}</a> <span style="font-size:13px; color:gray">{{.Updated}}</span></div>
+				<div style="margin-left:20px; font-size:20px; margin:5px"><a href="/{{$grp.Name}}/{{.Name}}/">{{.Name}}</a> <span style="font-size:13px; color:gray">{{.Updated}}</span></div>
 			{{end}}
 		{{end}}
 		<div style="height:10px"></div>
