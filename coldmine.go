@@ -470,7 +470,13 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		recentCommits = append(recentCommits, commitEl{ID: cc[0], Title: cc[1]})
 	}
 
-	top, err := gitTree(repo, "master")
+	tid, err := commitTree(repo, "master")
+	if err != nil {
+		log.Print(err)
+		http.NotFound(w, r)
+		return
+	}
+	top, err := gitTree(repo, tid)
 	if err != nil {
 		log.Print(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -627,8 +633,11 @@ func (b *Blob) Text() string {
 }
 
 func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
-	// TODO: get tree id from _pth_. show the tree.
-	top, err := gitTree(repo, "master")
+	t := strings.TrimPrefix(r.URL.Path, "/"+repo+"/tree/")
+	if t == "" {
+		t = "master"
+	}
+	top, err := gitTree(repo, t)
 	if err != nil {
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -651,30 +660,43 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	tmpl.Execute(w, info)
 }
 
-// gitTree returns top tree of the branch.
-func gitTree(repo, branch string) (*Tree, error) {
-	cmd := exec.Command("git", "rev-parse", branch)
+// commitTree find tree id from the commit id.
+// the commit id _c_ will always rev-parsed.
+func commitTree(repo, c string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", c)
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("(%v) %s", err, out))
+		return "", errors.New(fmt.Sprintf("(%v) %s", err, out))
 	}
 	id := out[:len(out)-1] // strip "\n"
-
 	cmd = exec.Command("git", "cat-file", "-p", string(id))
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("(%v) %s", err, out))
+		return "", errors.New(fmt.Sprintf("(%v) %s", err, out))
 	}
 	// find tree object id
 	t := strings.Split(string(out), "\n")[0]
 	if !strings.HasPrefix(t, "tree ") {
-		return nil, errors.New(`commit object content not starts with "tree "`)
+		return "", errors.New(`commit object content not starts with "tree "`)
 	}
-	tid := strings.Split(t, " ")[1]
+	return strings.Split(t, " ")[1], nil
+}
 
-	return parseTree(repo, tid, ""), nil
+// gitTree returns parsed *Tree object of given tree id.
+// the *Tree object contains all the child data.
+func gitTree(repo, t string) (*Tree, error) {
+	cmd := exec.Command("git", "cat-file", "-t", t)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("(%v) %s", err, out)
+	}
+	if string(out) != "tree\n" {
+		return nil, fmt.Errorf("%v is not a tree id of %v", t, repo)
+	}
+	return parseTree(repo, t, ""), nil
 }
 
 // parseTree parses tree hierarchy with given id and return a top tree.
