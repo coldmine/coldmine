@@ -198,9 +198,14 @@ func serveRoot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type repoInfo struct {
+	Name    string
+	Updated string
+}
+
 type repoGroup struct {
 	Name  string
-	Repos []string
+	Repos []repoInfo
 }
 
 func (g *repoGroup) String() string {
@@ -241,7 +246,7 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 			return nil, errors.New("entry should a directory: " + dp)
 		}
 		if gitDir(dp) {
-			ng.Repos = append(ng.Repos, fi.Name())
+			ng.Repos = append(ng.Repos, repoInfo{Name: fi.Name(), Updated: lastUpdate(dp)})
 			continue
 		}
 
@@ -267,7 +272,7 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 				return nil, errors.New("entry should a directory: " + ddp)
 			}
 			if gitDir(ddp) {
-				g.Repos = append(g.Repos, dfi.Name())
+				g.Repos = append(g.Repos, repoInfo{Name: dfi.Name(), Updated: lastUpdate(dp)})
 				continue
 			}
 			return nil, errors.New("max depth reached, but not a git directory: " + ddp)
@@ -289,10 +294,34 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 
 	// sort repoGroup.repos too.
 	for _, g := range grps {
-		sort.Strings(g.Repos)
+		sort.Sort(byName(g.Repos))
 	}
 
 	return grps, nil
+}
+
+type byName []repoInfo
+
+func (s byName) Len() int {
+	return len(s)
+}
+
+func (s byName) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s byName) Less(i, j int) bool {
+	return s[i].Name < s[j].Name
+}
+
+func lastUpdate(repo string) string {
+	cmd := exec.Command("git", "log", "--pretty=format:%ar", "-1")
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }
 
 func addRepo(repo string) error {
