@@ -32,18 +32,6 @@ func (b *Blob) String() string {
 	return fmt.Sprintf("blob: %v %v", b.Id[:8], b.Name)
 }
 
-// TODO: return error?
-func (b *Blob) Text() string {
-	cmd := exec.Command("git", "cat-file", "-p", b.Id)
-	cmd.Dir = b.Repo
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-		return ""
-	}
-	return string(out)
-}
-
 // gitDir checks whether the _d_ is git directory, or not.
 // if not found the path, it will return false.
 // any other error makes it fatal.
