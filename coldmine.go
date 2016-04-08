@@ -317,16 +317,6 @@ func (s byName) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }
 
-func lastUpdate(repo string) string {
-	cmd := exec.Command("git", "log", "--pretty=format:%ar", "-1")
-	cmd.Dir = repo
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return ""
-	}
-	return string(out)
-}
-
 func addRepo(repo string) error {
 	if repo == "" {
 		return errors.New("no repository name given.")
@@ -566,6 +556,11 @@ func nFilesInTree(t *Tree) int {
 	return n
 }
 
+type commitEl struct {
+	ID    string
+	Title string
+}
+
 func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	pp := strings.Split(pth, "/")
 	if pp[len(pp)-2] != "commit" {
@@ -604,61 +599,6 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	}
 }
 
-type commitEl struct {
-	ID    string
-	Title string
-}
-
-// gitDir checks whether the _d_ is git directory, or not.
-// if not found the path, it will return false.
-// any other error makes it fatal.
-func gitDir(d string) bool {
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
-	cmd.Dir = d
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
-		log.Fatalf("(%v) %s", err, out)
-	}
-	return string(out) == ".\n"
-}
-
-type Tree struct {
-	Repo  string
-	Id    string
-	Name  string
-	Trees []*Tree
-	Blobs []*Blob
-}
-
-func (t *Tree) String() string {
-	return fmt.Sprintf("tree: %v %v", t.Id[:8], t.Name)
-}
-
-type Blob struct {
-	Repo string
-	Id   string
-	Name string
-}
-
-func (b *Blob) String() string {
-	return fmt.Sprintf("blob: %v %v", b.Id[:8], b.Name)
-}
-
-// TODO: return error?
-func (b *Blob) Text() string {
-	cmd := exec.Command("git", "cat-file", "-p", b.Id)
-	cmd.Dir = b.Repo
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-		return ""
-	}
-	return string(out)
-}
-
 func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	t := strings.TrimPrefix(r.URL.Path, "/"+repo+"/tree/")
 	if t == "" {
@@ -685,77 +625,6 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		TopTree: top,
 	}
 	tmpl.Execute(w, info)
-}
-
-// commitTree find tree id from the commit id.
-// the commit id _c_ will always rev-parsed.
-func commitTree(repo, c string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", c)
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("(%v) %s", err, out))
-	}
-	id := out[:len(out)-1] // strip "\n"
-	cmd = exec.Command("git", "cat-file", "-p", string(id))
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("(%v) %s", err, out))
-	}
-	// find tree object id
-	t := strings.Split(string(out), "\n")[0]
-	if !strings.HasPrefix(t, "tree ") {
-		return "", errors.New(`commit object content not starts with "tree "`)
-	}
-	return strings.Split(t, " ")[1], nil
-}
-
-// gitTree returns parsed *Tree object of given tree id.
-// the *Tree object contains all the child data.
-func gitTree(repo, t string) (*Tree, error) {
-	cmd := exec.Command("git", "cat-file", "-t", t)
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("(%v) %s", err, out)
-	}
-	if string(out) != "tree\n" {
-		return nil, fmt.Errorf("%v is not a tree id of %v", t, repo)
-	}
-	return parseTree(repo, t, ""), nil
-}
-
-// parseTree parses tree hierarchy with given id and return a top tree.
-func parseTree(repo, id string, name string) *Tree {
-	top := &Tree{Repo: repo, Id: id, Name: name}
-
-	cmd := exec.Command("git", "cat-file", "-p", string(id))
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-	}
-	for _, l := range strings.Split(string(out), "\n") {
-		// the line looks like this.
-		// 100644 blob e6e777ec163436193a336a561cfbf57c3b06ccaa	README.md
-		// 100644 tree 8094086457b9e41a0c10ee3fef479056542da579	someDir
-		if l == "" {
-			// maybe last line.
-			continue
-		}
-		ll := strings.Split(l, "\t")
-		cinfos := strings.Split(ll[0], " ")
-		ctype := cinfos[1]
-		cid := cinfos[2]
-		cname := ll[1]
-		if ctype == "tree" {
-			top.Trees = append(top.Trees, parseTree(repo, cid, cname))
-		} else {
-			top.Blobs = append(top.Blobs, &Blob{Repo: repo, Id: cid, Name: cname})
-		}
-	}
-	return top
 }
 
 // treeEl holds information to draw each tree element.
@@ -805,22 +674,6 @@ func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Content: string(c),
 	}
 	t.Execute(w, info)
-}
-
-func blobContent(repo, b string) ([]byte, error) {
-	cmd := exec.Command("git", "cat-file", "-t", b)
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("(%v) %s", err, out)
-	}
-	if string(out) != "blob\n" {
-		return nil, fmt.Errorf("repo '%v' don't have blob '%v'", repo, b)
-	}
-	cmd = exec.Command("git", "cat-file", "-p", b)
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	c, _ := cmd.Output()
-	return c, nil
 }
 
 func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
@@ -903,6 +756,15 @@ func getInfoRefs(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		headerNoCache(w)
 		sendFile(w, r, "text/plain", pth)
 	}
+}
+
+// packetLine adds 4 digit hex length string to given string.
+func packetLine(l string) (string, error) {
+	h := strconv.FormatInt(int64(len(l)+4), 16)
+	if len(h) > 4 {
+		return "", errors.New("packet too long")
+	}
+	return strings.Repeat("0", 4-len(h)) + h + l, nil
 }
 
 func getTextFile(w http.ResponseWriter, r *http.Request, repo, pth string) {
@@ -1002,13 +864,4 @@ func sendFile(w http.ResponseWriter, r *http.Request, typ string, pth string) {
 	w.Header().Set("Content-Length", fmt.Sprintf("%v", f.Size()))
 	w.Header().Set("Last-Modified", f.ModTime().Format(http.TimeFormat))
 	http.ServeFile(w, r, pth)
-}
-
-// packetLine adds 4 digit hex length string to given string.
-func packetLine(l string) (string, error) {
-	h := strconv.FormatInt(int64(len(l)+4), 16)
-	if len(h) > 4 {
-		return "", errors.New("packet too long")
-	}
-	return strings.Repeat("0", 4-len(h)) + h + l, nil
 }
