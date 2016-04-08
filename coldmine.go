@@ -215,7 +215,7 @@ func (g *repoGroup) String() string {
 // dirScan scans _rootp_ directory. If the directory is not found,
 // it will created.
 // Max scan depth is 2. When child and grand child directory both are not
-// git directories, then it will raise panic.
+// git directories, then it will return error.
 // That means it should one of following form.
 //
 //   repo/gitdir
