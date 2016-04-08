@@ -275,7 +275,7 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 				return nil, errors.New("entry should a directory: " + ddp)
 			}
 			if gitDir(ddp) {
-				g.Repos = append(g.Repos, repoInfo{Name: dfi.Name(), Updated: lastUpdate(dp)})
+				g.Repos = append(g.Repos, repoInfo{Name: dfi.Name(), Updated: lastUpdate(ddp)})
 				continue
 			}
 			return nil, errors.New("max depth reached, but not a git directory: " + ddp)
