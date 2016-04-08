@@ -69,6 +69,7 @@ type Service struct {
 }
 
 var services = []Service{
+	// file serving
 	{"GET", regexp.MustCompile("^/HEAD$"), getHead},
 	{"GET", regexp.MustCompile("^/info/refs$"), getInfoRefs},
 	{"GET", regexp.MustCompile("^/objects/info/alternates$"), getTextFile},
@@ -78,9 +79,11 @@ var services = []Service{
 	{"GET", regexp.MustCompile("^/objects/pack/pack-[0-9a-f]{40}\\.pack$"), getPackFile},
 	{"GET", regexp.MustCompile("^/objects/pack/pack-[0-9a-f]{40}\\.idx$"), getIdxFile},
 
+	// git service
 	{"POST", regexp.MustCompile("^/git-upload-pack$"), serviceUpload},
 	{"POST", regexp.MustCompile("^/git-receive-pack$"), serviceReceive},
 
+	// web service
 	{"GET", regexp.MustCompile("^/$"), serveOverview},
 	{"GET", regexp.MustCompile("^/tree/"), serveTree},
 	{"GET", regexp.MustCompile("^/blob/"), serveBlob},
