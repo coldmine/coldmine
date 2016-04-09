@@ -1,0 +1,6 @@
+add review page using following command.
+
+ git merge --squash coldmine/review/1
+ git commit --reuse-message coldmine/review/1
+
+
