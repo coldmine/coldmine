@@ -89,6 +89,7 @@ var services = []Service{
 	{"GET", regexp.MustCompile("^/blob/"), serveBlob},
 	{"GET", regexp.MustCompile("^/commit/"), serveCommit},
 	{"GET", regexp.MustCompile("^/log/"), serveLog},
+	{"GET", regexp.MustCompile("^/review/"), serveReview},
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
@@ -712,6 +713,88 @@ type logEl struct {
 	ID      string
 	Date    string
 	Subject string
+}
+
+func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	pp := strings.Split(r.URL.Path, "/")
+	n := pp[len(pp)-1]
+	_, err := strconv.Atoi(n)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
+
+	// find merge-base commit between review branch and target branch.
+	b := "coldmine/review/" + n
+	targetb := "master" // TODO: find targetb really.
+	cmd := exec.Command("git", "merge-base", "--all", b, targetb)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("%v: (%v) %s", cmd, err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	base := strings.TrimSuffix(string(out), "\n")
+
+	// list commits the branch's last commit and merge-base commit.
+	cmd = exec.Command("git", "rev-list", b, base)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("%v: (%v) %s", cmd, err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	commits := strings.Split(string(out), "\n")
+	commits = commits[:len(commits)-2] // remove merge-base commit and empty line.
+
+	// generating diff
+	r.ParseForm()
+	if r.Form.Get("diff") != "" {
+		cmd = exec.Command("git", "show", "--pretty=format:commit %H\ntree: %T\nauthor: %an <%ae>\ndate: %ad\n\n\t%B", r.Form.Get("diff"))
+
+	} else {
+		from := commits[len(commits)-1] + "~1"
+		to := commits[0]
+		cmd = exec.Command("git", "diff", from, to)
+	}
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("%v: (%v) %s", cmd, err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	diff := string(out)
+	diffLines := strings.SplitAfter(diff, "\n")
+
+	// serve
+	info := struct {
+		Repo      string
+		ReviewNum string
+		Commits   []string
+		DiffLines []string
+	}{
+		Repo:      repo,
+		ReviewNum: n,
+		Commits:   commits,
+		DiffLines: diffLines,
+	}
+	fmap := template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+		"pickID": func(l string) string {
+			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
+		},
+	}
+	t, err := template.New("review.html").Funcs(fmap).ParseFiles("review.html", "top.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {

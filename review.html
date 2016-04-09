@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Coldmine</title>
+</head>
+<body>
+{{template "top.html" .}}
+<div id="review-left" style="display:inline-block; width:800px">
+	<div id="review-commits"></div>
+		{{range .Commits}}
+			<div><a href="/{{$.Repo}}/review/{{$.ReviewNum}}?diff={{.}}">{{.}}</a></div>
+		{{end}}<br>
+		<div><a href="/{{$.Repo}}/review/{{$.ReviewNum}}">full differences</a></div>
+	<div id="review-diff">
+		<pre>
+		{{- range .DiffLines -}}
+			{{- if hasPrefix . "tree: " -}}
+				<span>tree: <a href="/{{$.Repo}}/tree/{{pickID .}}">{{pickID .}}</a>
+</span>
+			{{- else if hasPrefix . "+" -}}
+				<span style="color:green">{{.}}</span>
+			{{- else if hasPrefix . "-" -}}
+				<span style="color:red">{{.}}</span>
+			{{- else -}}
+				<span>{{.}}</span>
+			{{- end -}}
+		{{- end -}}
+		</pre>
+	</div>
+</div>
+<div id="review-right" style="display:inline-block">
+</div>
+</body>
+</html>
