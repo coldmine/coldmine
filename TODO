@@ -1,6 +1,8 @@
-add review page using following command.
+- add review page using following command.
 
- git merge --squash coldmine/review/1
- git commit --reuse-message coldmine/review/1
+	git merge --squash coldmine/review/1
+	git commit --reuse-message coldmine/review/1
 
-think what is best use of <pre>.
+- think what is best use of <pre>.
+
+- prevent pushing to master.
