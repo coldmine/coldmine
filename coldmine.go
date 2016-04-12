@@ -607,11 +607,17 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 }
 
 func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
-	t := strings.TrimPrefix(r.URL.Path, "/"+repo+"/tree/")
-	if t == "" {
-		t = "master"
+	tid := strings.TrimPrefix(r.URL.Path, "/"+repo+"/tree/")
+	if tid == "" {
+		t, err := commitTree(repo, "master")
+		if err != nil {
+			log.Print(err)
+			http.NotFound(w, r)
+			return
+		}
+		tid = t
 	}
-	top, err := gitTree(repo, t)
+	top, err := gitTree(repo, tid)
 	if err != nil {
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
