@@ -61,7 +61,6 @@ func main() {
 	for _, g := range grps {
 		log.Print(g)
 	}
-	http.HandleFunc("/action", actionHandler)
 	http.HandleFunc("/", rootHandler)
 	log.Fatal(http.ListenAndServe(ipAddr, nil))
 }
@@ -101,8 +100,12 @@ var services = []Service{
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	log.Print(r.URL.Path)
 
-	if r.URL.Path == "/" {
+	switch r.URL.Path {
+	case "/":
 		serveRoot(w, r)
+		return
+	case "/action":
+		serveRootAction(w, r)
 		return
 	}
 
@@ -153,7 +156,7 @@ func splitURLPath(p string) (string, string) {
 	return "", ""
 }
 
-func actionHandler(w http.ResponseWriter, r *http.Request) {
+func serveRootAction(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	if r.Form.Get("password") != password {
