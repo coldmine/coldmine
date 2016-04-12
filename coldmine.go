@@ -820,7 +820,6 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 
 	} else {
 		cmd = exec.Command("git", "diff", base+"~1.."+b)
-		log.Print(cmd)
 	}
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
