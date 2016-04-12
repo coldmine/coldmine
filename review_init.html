@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Coldmine</title>
+</head>
+<body>
+{{template "top.html" .}}
+<div style="font-size:20px">
+This review has just initialized.<br>
+You need push "{{.Branch}}" branch to activate this review page.<br>
+<br>
+<span style="background-color:#BBBBBB; padding:10px">
+	git push origin {{.Branch}}
+</span>
+</div>
+
+</body>
+</html>

@@ -21,13 +21,17 @@ import (
 
 // TODO: template are must excuted at start of execution.
 
-var ipAddr string
-var repoRoot string
-var password string
+var (
+	ipAddr     string
+	repoRoot   string
+	reviewRoot string
+	password   string
+)
 
 func init() {
 	flag.StringVar(&ipAddr, "ip", ":8080", "ip address")
 	flag.StringVar(&repoRoot, "repo", "repo", "repository root directory")
+	flag.StringVar(&reviewRoot, "review", "review", "review data root directory")
 
 	b, err := ioutil.ReadFile("password")
 	if err != nil {
@@ -89,6 +93,8 @@ var services = []Service{
 	{"GET", regexp.MustCompile("^/blob/"), serveBlob},
 	{"GET", regexp.MustCompile("^/commit/"), serveCommit},
 	{"GET", regexp.MustCompile("^/log/"), serveLog},
+	{"GET", regexp.MustCompile("^/reviews/$"), serveReviews},
+	{"POST", regexp.MustCompile("^/reviews/action$"), serveReviewsAction},
 	{"GET", regexp.MustCompile("^/review/"), serveReview},
 }
 
@@ -111,7 +117,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if s.method != r.Method {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
 		s.serv(w, r, repo, filepath.Join(repoRoot, r.URL.Path[1:]))
@@ -715,21 +721,79 @@ type logEl struct {
 	Subject string
 }
 
+func serveReviews(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	info := struct {
+		Repo    string
+		Reviews []review
+	}{
+		Repo:    repo,
+		Reviews: listReviews(repo, 50),
+	}
+	t, err := template.ParseFiles("reviews.html", "top.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = t.Execute(w, info)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func serveReviewsAction(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	r.ParseForm()
+
+	if r.Form.Get("password") != password {
+		http.Error(w, "password not matched", http.StatusForbidden)
+		return
+	}
+
+	title := r.Form.Get("title")
+	if title != "" {
+		log.Printf("create a new review: %v", title)
+		createReview(repo, title)
+	}
+
+	http.Redirect(w, r, "/"+repo+"/reviews/", http.StatusSeeOther)
+}
+
 func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	pp := strings.Split(r.URL.Path, "/")
-	n := pp[len(pp)-1]
-	_, err := strconv.Atoi(n)
+	nstr := pp[len(pp)-1]
+	_, err := strconv.Atoi(nstr)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
 
 	// find merge-base commit between review branch and target branch.
-	b := "coldmine/review/" + n
-	targetb := "master" // TODO: find targetb really.
-	cmd := exec.Command("git", "merge-base", "--all", b, targetb)
+	b := "coldmine/review/" + nstr
+	cmd := exec.Command("git", "branch", "--list", b)
 	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if string(out) == "" {
+		info := struct {
+			Repo   string
+			Branch string
+		}{
+			Repo:   repo,
+			Branch: b,
+		}
+		t, err := template.ParseFiles("review_init.html", "top.html")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = t.Execute(w, info)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	cmd = exec.Command("git", "merge-base", "--octopus", b)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("%v: (%v) %s", cmd, err, out)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -738,7 +802,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	base := strings.TrimSuffix(string(out), "\n")
 
 	// list commits the branch's last commit and merge-base commit.
-	cmd = exec.Command("git", "rev-list", b, base)
+	cmd = exec.Command("git", "rev-list", base+"~1.."+b)
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -747,17 +811,16 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		return
 	}
 	commits := strings.Split(string(out), "\n")
-	commits = commits[:len(commits)-2] // remove merge-base commit and empty line.
+	commits = commits[:len(commits)-1] // remove merge-base commit and empty line.
 
 	// generating diff
 	r.ParseForm()
 	if r.Form.Get("diff") != "" {
-		cmd = exec.Command("git", "show", "--pretty=format:commit %H\ntree: %T\nauthor: %an <%ae>\ndate: %ad\n\n\t%B", r.Form.Get("diff"))
+		cmd = exec.Command("git", "show", "--pretty=format:commit %H%ntree: %T%nauthor: %an <%ae>%ndate: %ad%n%n\t%B", r.Form.Get("diff"))
 
 	} else {
-		from := commits[len(commits)-1] + "~1"
-		to := commits[0]
-		cmd = exec.Command("git", "diff", from, to)
+		cmd = exec.Command("git", "diff", base+"~1.."+b)
+		log.Print(cmd)
 	}
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
@@ -777,7 +840,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		DiffLines []string
 	}{
 		Repo:      repo,
-		ReviewNum: n,
+		ReviewNum: nstr,
 		Commits:   commits,
 		DiffLines: diffLines,
 	}

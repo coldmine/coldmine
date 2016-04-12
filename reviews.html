@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Coldmine</title>
+</head>
+<body>
+{{template "top.html" .}}
+<div>
+	<button onclick="showAddForm()">add</button>
+	<button onclick="hideForm()">cancel</button>
+</div>
+<form id="confirm-add" action="action" method="post" style="display:none">
+	Add repository: <input id="add-input" type="text" name="title" placeholder="title" /> <input type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
+</form>
+<br>
+
+{{range $.Reviews}}
+	<div><a href="/{{$.Repo}}/review/{{.Num}}">{{.Num}}: {{.Title}}</a></div>
+{{end}}
+</body>
+
+<script>
+function showAddForm() {
+	document.getElementById("confirm-add").style.display = "block";
+	document.getElementById("add-input").focus();
+}
+function hideForm() {
+	document.getElementById("confirm-add").style.display = "none";
+}
+</script>
+
+</html>
