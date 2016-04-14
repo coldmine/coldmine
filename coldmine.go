@@ -800,7 +800,8 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		}
 		return
 	}
-	cmd = exec.Command("git", "merge-base", "--octopus", b)
+	baseB := "master"
+	cmd = exec.Command("git", "merge-base", "--all", b, baseB)
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -820,7 +821,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		return
 	}
 	commits := strings.Split(string(out), "\n")
-	commits = commits[:len(commits)-1] // remove merge-base commit and empty line.
+	commits = commits[:len(commits)-2] // remove merge-base commit and empty line.
 
 	// generating diff
 	r.ParseForm()
