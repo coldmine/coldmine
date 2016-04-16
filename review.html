@@ -6,6 +6,20 @@
 </head>
 <body>
 {{template "top.html" .}}
+<div>
+	<button onclick="showMergeForm()">merge</button>
+	<button onclick="showCloseForm()">close</button>
+	<button onclick="hideForms()">cancel</button>
+</div>
+<form id="confirm-merge" action="./action" method="post" style="display:none">
+	Merge repository: <input name="n" value="{{$.ReviewNum}}" style="display:none"> <input name="action" value="merge" style="display:none"> <input id="merge-password" type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
+</form>
+<form id="confirm-close" action="./action" method="post" style="display:none">
+	Close review: <input name="n" value="{{$.ReviewNum}}" style="display:none"> <input name="action" value="close" style="display:none"> <input id="close-password" type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
+</form>
+
+<div>Status: {{$.ReviewStatus}}</div><br>
+
 <div id="review-left" style="display:inline-block; width:800px">
 	<div id="review-commits"></div>
 		{{range .Commits}}
@@ -32,4 +46,22 @@
 <div id="review-right" style="display:inline-block">
 </div>
 </body>
+
+<script>
+function showMergeForm() {
+	document.getElementById("confirm-close").style.display = "none";
+	document.getElementById("confirm-merge").style.display = "block";
+	document.getElementById("merge-password").focus();
+}
+function showCloseForm() {
+	document.getElementById("confirm-merge").style.display = "none";
+	document.getElementById("confirm-close").style.display = "block";
+	document.getElementById("close-password").focus();
+}
+function hideForms() {
+	document.getElementById("confirm-merge").style.display = "none";
+	document.getElementById("confirm-close").style.display = "none";
+}
+</script>
+
 </html>

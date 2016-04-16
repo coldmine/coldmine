@@ -4,10 +4,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
+	"sync"
 )
 
 var reviewDirPattern = regexp.MustCompile("^([0-9]+)[.](open|merged|closed)$")
@@ -102,4 +104,65 @@ func lastReviewNum(repo string) int {
 		}
 	}
 	return last + 1
+}
+
+// mergeReview merges nth review of the repo to some branch.
+func mergeReview(repo string, n int, toB string) {
+	d := filepath.Join(reviewRoot, repo, strconv.Itoa(n)+".open")
+	_, err := os.Stat(d)
+	if os.IsNotExist(err) {
+		log.Fatalf("merge directory not found: %v", err)
+	}
+	out, err := ioutil.ReadFile(filepath.Join(d, "TITLE"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	msg := string(out)
+
+	// find out old branch
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
+	oldB := string(out)
+
+	// follow procedure will change branch.
+	// prevent execute other git command on this repo.
+	var m = &sync.Mutex{}
+	m.Lock()
+	defer m.Unlock()
+
+	cmd = exec.Command("git", "checkout", toB)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("%v: %s", err, out)
+	}
+	cmd = exec.Command("git", "merge", "--squash", "coldmine/review/"+strconv.Itoa(n))
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("%v: %s", err, out)
+	}
+	cmd = exec.Command("git", "commit", "-m", msg)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("%v: %s", err, out)
+	}
+	cmd = exec.Command("git", "checkout", oldB)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("%v: %s", err, out)
+	}
+
+	os.Rename(d, filepath.Join(reviewRoot, repo, strconv.Itoa(n)+".merged"))
+}
+
+func closeReview(repo string, n int) {
+	d := filepath.Join(reviewRoot, repo, strconv.Itoa(n)+".open")
+	os.Rename(d, filepath.Join(reviewRoot, repo, strconv.Itoa(n)+".closed"))
 }

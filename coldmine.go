@@ -92,8 +92,9 @@ var services = []Service{
 	{"GET", regexp.MustCompile("^/blob/"), serveBlob},
 	{"GET", regexp.MustCompile("^/commit/"), serveCommit},
 	{"GET", regexp.MustCompile("^/log/"), serveLog},
-	{"GET", regexp.MustCompile("^/reviews/$"), serveReviews},
 	{"POST", regexp.MustCompile("^/reviews/action$"), serveReviewsAction},
+	{"GET", regexp.MustCompile("^/reviews/$"), serveReviews},
+	{"POST", regexp.MustCompile("^/review/action$"), serveReviewAction},
 	{"GET", regexp.MustCompile("^/review/"), serveReview},
 }
 
@@ -774,6 +775,26 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		return
 	}
 
+	reviewDirPattern := filepath.Join(reviewRoot, repo, nstr+".*")
+	log.Print(reviewDirPattern)
+	g, err := filepath.Glob(reviewDirPattern)
+	if err != nil {
+		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if len(g) == 0 {
+		http.NotFound(w, r)
+		return
+	} else if len(g) > 1 {
+		log.Printf("should glob only one review directory: %v found - %v", len(g), g)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	reviewDir := g[0]
+	ss := strings.Split(reviewDir, ".")
+	reviewStatus := ss[len(ss)-1]
+
 	// find merge-base commit between review branch and target branch.
 	b := "coldmine/review/" + nstr
 	cmd := exec.Command("git", "branch", "--list", b)
@@ -843,15 +864,17 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 
 	// serve
 	info := struct {
-		Repo      string
-		ReviewNum string
-		Commits   []string
-		DiffLines []string
+		Repo         string
+		ReviewNum    string
+		ReviewStatus string
+		Commits      []string
+		DiffLines    []string
 	}{
-		Repo:      repo,
-		ReviewNum: nstr,
-		Commits:   commits,
-		DiffLines: diffLines,
+		Repo:         repo,
+		ReviewNum:    nstr,
+		ReviewStatus: reviewStatus,
+		Commits:      commits,
+		DiffLines:    diffLines,
 	}
 	fmap := template.FuncMap{
 		"hasPrefix": strings.HasPrefix,
@@ -867,6 +890,29 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func serveReviewAction(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	r.ParseForm()
+	if r.Form.Get("password") != password {
+		http.Error(w, "password not matched", http.StatusForbidden)
+		return
+	}
+	nstr := r.Form.Get("n")
+	n, err := strconv.Atoi(nstr)
+	if err != nil {
+		log.Printf("could not get review number: %v", err)
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
+	act := r.Form.Get("action")
+	if act == "merge" {
+		mergeReview(repo, n, "master")
+	} else if act == "close" {
+		closeReview(repo, n)
+	}
+	redirectPath := strings.TrimSuffix(r.URL.Path, "action") + nstr
+	http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 }
 
 func getHead(w http.ResponseWriter, r *http.Request, repo, pth string) {
