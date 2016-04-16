@@ -259,6 +259,9 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 		if !fi.IsDir() {
 			return nil, errors.New("entry should a directory: " + dp)
 		}
+		if strings.HasSuffix(dp, ".r") {
+			continue
+		}
 		if gitDir(dp) {
 			ng.Repos = append(ng.Repos, repoInfo{Name: fi.Name(), Updated: lastUpdate(dp)})
 			continue
@@ -284,6 +287,9 @@ func dirScan(rootp string) ([]*repoGroup, error) {
 			ddp := filepath.Join(dp, dfi.Name())
 			if !dfi.IsDir() {
 				return nil, errors.New("entry should a directory: " + ddp)
+			}
+			if strings.HasSuffix(ddp, ".r") {
+				continue
 			}
 			if gitDir(ddp) {
 				g.Repos = append(g.Repos, repoInfo{Name: dfi.Name(), Updated: lastUpdate(ddp)})
@@ -338,6 +344,10 @@ func addRepo(repo string) error {
 	if len(strings.Split(repo, "/")) > 3 {
 		return fmt.Errorf("repository path too deep: %v", repo)
 	}
+	if strings.Contains(repo, ".") {
+		return fmt.Errorf("repository name should not have dot(.): %v", repo)
+	}
+
 	d := filepath.Join(repoRoot, repo)
 	_, err := os.Stat(d)
 	if err == nil {
@@ -351,9 +361,54 @@ func addRepo(repo string) error {
 	cmd.Dir = d
 	out, err := cmd.Output()
 	if err != nil {
-		// TODO: die directly? because it make program terminated eventually.
-		return fmt.Errorf("repository initialzation failed: (%v) %v", err, string(out))
+		log.Fatalf("repository initialzation failed: (%v) %v", err, string(out))
 	}
+
+	// create non-bare repo for review.
+	// it will be used to merge review branch to destination branch.
+	rd := d + ".r"
+	_, err = os.Stat(rd)
+	if err == nil {
+		return fmt.Errorf("review repository already exist: %v", repo)
+	}
+	err = os.MkdirAll(rd, 0755)
+	if err != nil {
+		return fmt.Errorf("couldn't make repository: %v: %v", repo, err)
+	}
+	cmd = exec.Command("git", "init")
+	cmd.Dir = rd
+	out, err = cmd.Output()
+	if err != nil {
+		log.Fatalf("review repository initialzation failed: (%v) %v", err, string(out))
+	}
+	cmd = exec.Command("git", "remote", "add", "origin", "../"+filepath.Base(repo))
+	cmd.Dir = rd
+	out, err = cmd.Output()
+	if err != nil {
+		log.Fatalf("review repository setup origin failed: (%v) %v", err, string(out))
+	}
+
+	// setup after-receive hooks, for auto pull to review direcotry.
+	hook := fmt.Sprintf(`#!/bin/sh
+unset $(git rev-parse --local-env-vars)
+while read oldrev newrev refname
+do
+	branch=$(git rev-parse --symbolic --abbrev-ref $refname)
+	cd ../%v
+	if [ "$branch" == "master" ]; then
+		git pull origin master
+	else
+		git fetch origin --update-head-ok $branch
+		git branch -f $branch origin/$branch
+	fi
+	cd $OLDPWD
+done
+`, filepath.Base(rd))
+	err = ioutil.WriteFile(filepath.Join(d, "hooks", "post-receive"), []byte(hook), 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return nil
 }
 
@@ -371,7 +426,6 @@ func removeRepo(repo string) error {
 		return fmt.Errorf("repository not exist: %v", repo)
 	}
 	defer df.Close()
-
 	rr := strings.Split(repo, "/")
 	if len(rr) > 3 {
 		return fmt.Errorf("repository path too deep: %v", repo)
@@ -387,10 +441,16 @@ func removeRepo(repo string) error {
 			return fmt.Errorf("group has child repository: %v", repo)
 		}
 	}
-
 	err = os.RemoveAll(d)
 	if err != nil {
 		return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
+	}
+
+	// also remove the review directory.
+	rd := d + ".r"
+	err = os.RemoveAll(rd)
+	if err != nil {
+		return fmt.Errorf("couldn't remove review repository: %v: %v", repo, err)
 	}
 
 	if len(rr) == 2 {
@@ -410,6 +470,12 @@ func removeRepo(repo string) error {
 			err = os.Remove(pd)
 			if err != nil {
 				return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
+			}
+			// alose remove review group directory.
+			rd := filepath.Join(reviewRoot, "git", rr[0])
+			err = os.Remove(rd)
+			if err != nil {
+				return fmt.Errorf("couldn't remove review repository: %v: %v", repo, err)
 			}
 		}
 	}

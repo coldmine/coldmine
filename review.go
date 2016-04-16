@@ -134,26 +134,35 @@ func mergeReview(repo string, n int, toB string) {
 	m.Lock()
 	defer m.Unlock()
 
+	// actual process will done in {repo}.r directory.
+	// then it will push to {repo} directory.
+	rd := filepath.Join(repoRoot, repo+".r")
 	cmd = exec.Command("git", "checkout", toB)
-	cmd.Dir = filepath.Join(repoRoot, repo)
+	cmd.Dir = rd
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("%v: %s", err, out)
 	}
 	cmd = exec.Command("git", "merge", "--squash", "coldmine/review/"+strconv.Itoa(n))
-	cmd.Dir = filepath.Join(repoRoot, repo)
+	cmd.Dir = rd
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("%v: %s", err, out)
 	}
 	cmd = exec.Command("git", "commit", "-m", msg)
-	cmd.Dir = filepath.Join(repoRoot, repo)
+	cmd.Dir = rd
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("%v: %s", err, out)
+	}
+	cmd = exec.Command("git", "push", toB)
+	cmd.Dir = rd
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("%v: %s", err, out)
 	}
 	cmd = exec.Command("git", "checkout", oldB)
-	cmd.Dir = filepath.Join(repoRoot, repo)
+	cmd.Dir = rd
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("%v: %s", err, out)
