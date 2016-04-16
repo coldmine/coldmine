@@ -144,3 +144,15 @@ func blobContent(repo, b string) ([]byte, error) {
 	c, _ := cmd.Output()
 	return c, nil
 }
+
+// initialCommitID will return initial commit id of the repo.
+// it will return empty string if the repo don't have any commit yet.
+func initialCommitID(repo string) string {
+	cmd := exec.Command("git", "rev-list", "--all", "--reverse")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("(%v) %s", err, out)
+	}
+	return strings.Split(string(out), "\n")[0]
+}

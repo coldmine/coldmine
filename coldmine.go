@@ -831,9 +831,12 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		return
 	}
 	base := strings.TrimSuffix(string(out), "\n")
+	if base != initialCommitID(repo) {
+		base += "~1"
+	}
 
 	// list commits the branch's last commit and merge-base commit.
-	cmd = exec.Command("git", "rev-list", base+"~1.."+b)
+	cmd = exec.Command("git", "rev-list", base+".."+b)
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -850,7 +853,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		cmd = exec.Command("git", "show", "--pretty=format:commit %H%ntree: %T%nauthor: %an <%ae>%ndate: %ad%n%n\t%B", r.Form.Get("diff"))
 
 	} else {
-		cmd = exec.Command("git", "diff", base+"~1.."+b)
+		cmd = exec.Command("git", "diff", base+".."+b)
 	}
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err = cmd.CombinedOutput()
