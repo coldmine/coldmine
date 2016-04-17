@@ -152,7 +152,19 @@ func initialCommitID(repo string) string {
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("(%v) %s", err, out)
+		log.Print("%v: (%v) %s", cmd, err, out)
+		return ""
 	}
 	return strings.Split(string(out), "\n")[0]
+}
+
+func currentBranch(repo string) string {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Print("%v: (%v) %s", cmd, err, out)
+		return ""
+	}
+	return strings.TrimSuffix(string(out), "\n")
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -51,7 +53,8 @@ func listReviews(repo string, n int) []review {
 		if err != nil {
 			log.Fatal(err)
 		}
-		b, err := ioutil.ReadFile(filepath.Join(d, nstr+".open", "TITLE"))
+		status := m[2]
+		b, err := ioutil.ReadFile(filepath.Join(d, nstr+"."+status, "TITLE"))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -107,7 +110,7 @@ func lastReviewNum(repo string) int {
 }
 
 // mergeReview merges nth review of the repo to some branch.
-func mergeReview(repo string, n int, toB string) {
+func mergeReview(repo string, n int, b, toB string) {
 	d := filepath.Join(reviewRoot, repo, strconv.Itoa(n)+".open")
 	_, err := os.Stat(d)
 	if os.IsNotExist(err) {
@@ -119,56 +122,63 @@ func mergeReview(repo string, n int, toB string) {
 	}
 	msg := string(out)
 
-	// find out old branch
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref")
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatal(err)
-	}
-	oldB := string(out)
-
-	// follow procedure will change branch.
+	// follow procedure will change branch of review repo.
 	// prevent execute other git command on this repo.
 	var m = &sync.Mutex{}
 	m.Lock()
 	defer m.Unlock()
 
-	// actual process will done in {repo}.r directory.
-	// then it will push to {repo} directory.
 	rd := filepath.Join(repoRoot, repo+".r")
-	cmd = exec.Command("git", "checkout", toB)
-	cmd.Dir = rd
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatalf("%v: %s", err, out)
+	// restore original HEAD branch after merge it.
+	oldB := currentBranch(repo)
+	defer func() {
+		cmd := exec.Command("git", "checkout", oldB)
+		cmd.Dir = rd
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("(%v) %s", err, out)
+		}
+	}()
+
+	commands := []*exec.Cmd{
+		exec.Command("git", "checkout", toB),
+		exec.Command("git", "merge", "--squash", b),
+		exec.Command("git", "commit", "-m", msg),
+		exec.Command("git", "push", "origin", toB),
 	}
-	cmd = exec.Command("git", "merge", "--squash", "coldmine/review/"+strconv.Itoa(n))
-	cmd.Dir = rd
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatalf("%v: %s", err, out)
-	}
-	cmd = exec.Command("git", "commit", "-m", msg)
-	cmd.Dir = rd
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatalf("%v: %s", err, out)
-	}
-	cmd = exec.Command("git", "push", toB)
-	cmd.Dir = rd
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatalf("%v: %s", err, out)
-	}
-	cmd = exec.Command("git", "checkout", oldB)
-	cmd.Dir = rd
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatalf("%v: %s", err, out)
+	for _, cmd := range commands {
+		cmd.Dir = rd
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("%v: (%v) %s", cmd, err, out)
+		}
 	}
 
 	os.Rename(d, filepath.Join(reviewRoot, repo, strconv.Itoa(n)+".merged"))
+}
+
+// reviewCommits check target brach's fork-point from the base branch.
+// then return commits from the fork-point commit to leaf commit.
+// if the repo doesn't have any commits, then it will empty slice and will not raise error.
+func reviewCommits(repo, b, baseB string) ([]string, error) {
+	cmd := exec.Command("git", "merge-base", "--all", b, baseB)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("%v: (%v) %s", cmd, err, out)
+	}
+	base := strings.TrimSuffix(string(out), "\n")
+
+	// list commits the branch's last commit and merge-base commit.
+	cmd = exec.Command("git", "rev-list", base+".."+b)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("%v: (%v) %s", cmd, err, out)
+	}
+	commits := strings.Split(string(out), "\n")
+	commits = commits[:len(commits)-1] // remove empty line.
+	return commits, nil
 }
 
 func closeReview(repo string, n int) {

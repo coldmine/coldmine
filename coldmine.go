@@ -861,15 +861,22 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	ss := strings.Split(reviewDir, ".")
 	reviewStatus := ss[len(ss)-1]
 
-	// find merge-base commit between review branch and target branch.
+	// check the review branch actually pushed.
 	b := "coldmine/review/" + nstr
-	cmd := exec.Command("git", "branch", "--list", b)
+	cmd := exec.Command("git", "branch")
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.Output()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("%v: (%v) %s", cmd, err, out)
 	}
-	if string(out) == "" {
+	find := false
+	for _, l := range strings.Split(string(out), "\n") {
+		l = strings.TrimLeft(l, "* ")
+		if l == b {
+			find = true
+		}
+	}
+	if !find {
 		info := struct {
 			Repo   string
 			Branch string
@@ -887,31 +894,19 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		}
 		return
 	}
+
+	// find merge-base commit between review branch and target branch.
+
 	baseB := "master"
-	cmd = exec.Command("git", "merge-base", "--all", b, baseB)
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err = cmd.CombinedOutput()
+	commits, err := reviewCommits(repo, b, baseB)
 	if err != nil {
-		log.Printf("%v: (%v) %s", cmd, err, out)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+		log.Fatal(err)
 	}
-	base := strings.TrimSuffix(string(out), "\n")
+	base := commits[0]
 	if base != initialCommitID(repo) {
+		// unfortunately, there seems no way for diffing against empty commit.
 		base += "~1"
 	}
-
-	// list commits the branch's last commit and merge-base commit.
-	cmd = exec.Command("git", "rev-list", base+".."+b)
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("%v: (%v) %s", cmd, err, out)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	commits := strings.Split(string(out), "\n")
-	commits = commits[:len(commits)-2] // remove merge-base commit and empty line.
 
 	// generating diff
 	r.ParseForm()
@@ -976,7 +971,7 @@ func serveReviewAction(w http.ResponseWriter, r *http.Request, repo, pth string)
 	}
 	act := r.Form.Get("action")
 	if act == "merge" {
-		mergeReview(repo, n, "master")
+		mergeReview(repo, n, "coldmine/review/"+nstr, "master")
 	} else if act == "close" {
 		closeReview(repo, n)
 	}
