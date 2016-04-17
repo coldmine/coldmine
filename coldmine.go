@@ -842,7 +842,6 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	}
 
 	reviewDirPattern := filepath.Join(reviewRoot, repo, nstr+".*")
-	log.Print(reviewDirPattern)
 	g, err := filepath.Glob(reviewDirPattern)
 	if err != nil {
 		log.Print(err)
