@@ -6,17 +6,19 @@
 </head>
 <body>
 {{template "top.html" .}}
-<div>
-	<button onclick="showMergeForm()">merge</button>
-	<button onclick="showCloseForm()">close</button>
-	<button onclick="hideForms()">cancel</button>
-</div>
-<form id="confirm-merge" action="./action" method="post" style="display:none">
-	Merge repository: <input name="n" value="{{$.ReviewNum}}" style="display:none"> <input name="action" value="merge" style="display:none"> <input id="merge-password" type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
-</form>
-<form id="confirm-close" action="./action" method="post" style="display:none">
-	Close review: <input name="n" value="{{$.ReviewNum}}" style="display:none"> <input name="action" value="close" style="display:none"> <input id="close-password" type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
-</form>
+{{if eq $.ReviewStatus "open"}}
+	<div>
+		<button onclick="showMergeForm()">merge</button>
+		<button onclick="showCloseForm()">close</button>
+		<button onclick="hideForms()">cancel</button>
+	</div>
+	<form id="confirm-merge" action="./action" method="post" style="display:none">
+		Merge repository: <input name="n" value="{{$.ReviewNum}}" style="display:none"> <input name="action" value="merge" style="display:none"> <input id="merge-password" type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
+	</form>
+	<form id="confirm-close" action="./action" method="post" style="display:none">
+		Close review: <input name="n" value="{{$.ReviewNum}}" style="display:none"> <input name="action" value="close" style="display:none"> <input id="close-password" type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
+	</form>
+{{end}}
 
 <div>Status: {{$.ReviewStatus}}</div><br>
 
