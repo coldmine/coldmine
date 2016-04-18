@@ -14,9 +14,8 @@
 	Add repository: <input id="add-input" type="text" name="title" placeholder="title" /> <input type="password" name="password" placeholder="password" /> <input type="submit" value="ok" />
 </form>
 <br>
-
 {{range $.Reviews}}
-	<div><a href="/{{$.Repo}}/review/{{.Num}}">{{.Num}}: {{.Title}}</a></div>
+	<pre style="margin:0px">{{printf "%8v" .Num}} <span style="color:{{color .Status}}">{{printf "%7v" .Status}}</span>  <a href="/{{$.Repo}}/review/{{.Num}}">{{.Title}}</a></pre>
 {{end}}
 </body>
 

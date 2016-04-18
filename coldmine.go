@@ -805,7 +805,19 @@ func serveReviews(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo:    repo,
 		Reviews: listReviews(repo, 50),
 	}
-	t, err := template.ParseFiles("reviews.html", "top.html")
+	fmap := template.FuncMap{
+		"color": func(status string) string {
+			switch status {
+			case "merged":
+				return "blue"
+			case "closed":
+				return "gray"
+			default:
+				return "black"
+			}
+		},
+	}
+	t, err := template.New("reviews.html").Funcs(fmap).ParseFiles("reviews.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}

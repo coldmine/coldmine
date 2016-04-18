@@ -17,8 +17,9 @@ import (
 var reviewDirPattern = regexp.MustCompile("^([0-9]+)[.](open|merged|closed)$")
 
 type review struct {
-	Num   int
-	Title string
+	Num    int
+	Title  string
+	Status string
 }
 
 func listReviews(repo string, n int) []review {
@@ -58,7 +59,7 @@ func listReviews(repo string, n int) []review {
 		if err != nil {
 			log.Fatal(err)
 		}
-		reviews = append(reviews, review{Num: n, Title: string(b)})
+		reviews = append(reviews, review{Num: n, Title: string(b), Status: status})
 	}
 	return reviews
 }
