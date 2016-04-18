@@ -419,20 +419,20 @@ func removeRepo(repo string) error {
 	if strings.HasPrefix(repo, "/") {
 		return errors.New("no permission for that!")
 	}
-
-	d := filepath.Join(repoRoot, repo)
-	df, err := os.Open(d)
-	if os.IsNotExist(err) {
-		return fmt.Errorf("repository not exist: %v", repo)
-	}
-	defer df.Close()
 	rr := strings.Split(repo, "/")
 	if len(rr) > 3 {
 		return fmt.Errorf("repository path too deep: %v", repo)
 	}
+
+	d := filepath.Join(repoRoot, repo)
 	if len(rr) == 1 {
 		// if the directory has sub directory, then
 		// it's repository group and should not deleted.
+		df, err := os.Open(d)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("repository not exist: %v", repo)
+		}
+		defer df.Close()
 		fi, err := df.Readdir(1)
 		if err != nil {
 			return fmt.Errorf("couldn't read dir: %v", err)
@@ -441,16 +441,18 @@ func removeRepo(repo string) error {
 			return fmt.Errorf("group has child repository: %v", repo)
 		}
 	}
-	err = os.RemoveAll(d)
+	// we should remove 3 directory related with this repo.
+	err := os.RemoveAll(d)
 	if err != nil {
 		return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
 	}
-
-	// also remove the review directory.
-	rd := d + ".r"
-	err = os.RemoveAll(rd)
+	err = os.RemoveAll(d + ".r")
 	if err != nil {
 		return fmt.Errorf("couldn't remove review repository: %v: %v", repo, err)
+	}
+	err = os.RemoveAll(filepath.Join(reviewRoot, repo))
+	if err != nil {
+		return fmt.Errorf("couldn't remove review data directory: %v: %v", repo, err)
 	}
 
 	if len(rr) == 2 {
@@ -471,11 +473,9 @@ func removeRepo(repo string) error {
 			if err != nil {
 				return fmt.Errorf("couldn't remove repository: %v: %v", repo, err)
 			}
-			// alose remove review group directory.
-			rd := filepath.Join(reviewRoot, "git", rr[0])
-			err = os.Remove(rd)
+			err = os.Remove(filepath.Join(reviewRoot, rr[0]))
 			if err != nil {
-				return fmt.Errorf("couldn't remove review repository: %v: %v", repo, err)
+				return fmt.Errorf("couldn't remove review group directory: %v: %v", repo, err)
 			}
 		}
 	}
