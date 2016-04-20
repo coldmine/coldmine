@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -129,6 +130,28 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusForbidden)
+}
+
+func checkAuth(r *http.Request) bool {
+	r.ParseForm()
+	authHeader := r.Header.Get("Authorization")
+	auths := strings.Split(authHeader, " ")
+	if len(auths) != 2 || auths[0] != "Basic" {
+		return false
+	}
+	b, err := base64.StdEncoding.DecodeString(auths[1])
+	if err != nil {
+		return false
+	}
+	pair := strings.Split(string(b), ":")
+	if len(pair) != 2 {
+		return false
+	}
+	user, passwd := pair[0], pair[1]
+	if user != "coldmine" || passwd != password {
+		return false
+	}
+	return true
 }
 
 // splitURLPath split url path to repo, subpath.
@@ -1074,6 +1097,12 @@ func serviceUpload(w http.ResponseWriter, r *http.Request, repo, pth string) {
 }
 
 func serviceReceive(w http.ResponseWriter, r *http.Request, repo, pth string) {
+	if !checkAuth(r) {
+		w.Header().Set("WWW-Authenticate", `Basic realm="COLDMINE"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("401 Unathorized\n"))
+		return
+	}
 	service(w, r, "receive-pack", repo, pth)
 }
 
