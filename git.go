@@ -61,9 +61,18 @@ func lastUpdate(repo string) string {
 // commitTree find tree id from the commit id.
 // the commit id _c_ will always rev-parsed.
 func commitTree(repo, c string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", c)
+	cmd := exec.Command("git", "cat-file", "-t", c)
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("(%v) %s", err, out))
+	}
+	if string(out) != "commit\n" {
+		return "", errors.New(fmt.Sprintf("%v is not a commit id", c))
+	}
+	cmd = exec.Command("git", "rev-parse", c)
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("(%v) %s", err, out))
 	}

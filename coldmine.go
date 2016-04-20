@@ -690,7 +690,7 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	top, err := gitTree(repo, tid)
 	if err != nil {
 		log.Print(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	fmap := template.FuncMap{
