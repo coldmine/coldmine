@@ -412,7 +412,7 @@ func addRepo(repo string) error {
 	}
 
 	// setup after-receive hooks, for auto pull to review direcotry.
-	hook := fmt.Sprintf(`#!/bin/sh
+	hook := fmt.Sprintf(`#!/bin/bash
 unset $(git rev-parse --local-env-vars)
 while read oldrev newrev refname
 do
