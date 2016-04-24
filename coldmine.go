@@ -214,7 +214,7 @@ func serveRootAction(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveRoot(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("index.html", "top.html")
+	t, err := template.ParseFiles("index.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -527,7 +527,7 @@ func serveInit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo: repo,
 		IP:   newIPAddr,
 	}
-	t, err := template.ParseFiles("init.html", "top.html")
+	t, err := template.ParseFiles("init.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -638,7 +638,7 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		HasReadme:     hasReadme,
 		Readme:        readme,
 	}
-	t, err := template.ParseFiles("overview.html", "top.html")
+	t, err := template.ParseFiles("overview.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -689,7 +689,7 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
 		},
 	}
-	t, err := template.New("commit.html").Funcs(fmap).ParseFiles("commit.html", "top.html")
+	t, err := template.New("commit.html").Funcs(fmap).ParseFiles("commit.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -719,7 +719,7 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	fmap := template.FuncMap{
 		"reprTrees": reprTrees,
 	}
-	tmpl, err := template.New("tree.html").Funcs(fmap).ParseFiles("tree.html", "top.html")
+	tmpl, err := template.New("tree.html").Funcs(fmap).ParseFiles("tree.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -768,7 +768,7 @@ func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	t, err := template.ParseFiles("blob.html", "top.html")
+	t, err := template.ParseFiles("blob.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -804,7 +804,7 @@ func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo: repo,
 		Logs: logs,
 	}
-	t, err := template.ParseFiles("log.html", "top.html")
+	t, err := template.ParseFiles("log.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -840,7 +840,7 @@ func serveReviews(w http.ResponseWriter, r *http.Request, repo, pth string) {
 			}
 		},
 	}
-	t, err := template.New("reviews.html").Funcs(fmap).ParseFiles("reviews.html", "top.html")
+	t, err := template.New("reviews.html").Funcs(fmap).ParseFiles("reviews.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -918,7 +918,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 			Repo:   repo,
 			Branch: b,
 		}
-		t, err := template.ParseFiles("review_init.html", "top.html")
+		t, err := template.ParseFiles("review_init.html", "head.html", "top.html")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -980,7 +980,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
 		},
 	}
-	t, err := template.New("review.html").Funcs(fmap).ParseFiles("review.html", "top.html")
+	t, err := template.New("review.html").Funcs(fmap).ParseFiles("review.html", "head.html", "top.html")
 	if err != nil {
 		log.Fatal(err)
 	}
