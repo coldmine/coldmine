@@ -20,13 +20,48 @@ import (
 	"time"
 )
 
-// TODO: template are must excuted at start of execution.
-
 var (
 	ipAddr     string
 	repoRoot   string
 	reviewRoot string
 	password   string
+
+	// create templates
+	overviewTmpl = template.Must(template.ParseFiles("overview.html", "head.html", "top.html"))
+	treeFmap     = template.FuncMap{
+		"reprTrees": reprTrees,
+	}
+	treeTmpl   = template.Must(template.New("tree.html").Funcs(treeFmap).ParseFiles("tree.html", "head.html", "top.html"))
+	blobTmpl   = template.Must(template.ParseFiles("blob.html", "head.html", "top.html"))
+	commitFmap = template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+		"pickID": func(l string) string {
+			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
+		},
+	}
+	commitTmpl  = template.Must(template.New("commit.html").Funcs(commitFmap).ParseFiles("commit.html", "head.html", "top.html"))
+	logTmpl     = template.Must(template.ParseFiles("log.html", "head.html", "top.html"))
+	reviewsFmap = template.FuncMap{
+		"color": func(status string) string {
+			switch status {
+			case "merged":
+				return "blue"
+			case "closed":
+				return "gray"
+			default:
+				return "black"
+			}
+		},
+	}
+	reviewsTmpl    = template.Must(template.New("reviews.html").Funcs(reviewsFmap).ParseFiles("reviews.html", "head.html", "top.html"))
+	reviewInitTmpl = template.Must(template.ParseFiles("review_init.html", "head.html", "top.html"))
+	reviewFmap     = template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+		"pickID": func(l string) string {
+			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
+		},
+	}
+	reviewTmpl = template.Must(template.New("review.html").Funcs(reviewFmap).ParseFiles("review.html", "head.html", "top.html"))
 )
 
 func init() {
@@ -49,6 +84,7 @@ func init() {
 		fmt.Println("password file should not empty (need password).")
 		os.Exit(1)
 	}
+
 }
 
 func main() {
@@ -638,11 +674,7 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		HasReadme:     hasReadme,
 		Readme:        readme,
 	}
-	t, err := template.ParseFiles("overview.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(w, info)
+	err = overviewTmpl.Execute(w, info)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -683,17 +715,7 @@ func serveCommit(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo:     repo,
 		Contents: strings.SplitAfter(string(out), "\n"),
 	}
-	fmap := template.FuncMap{
-		"hasPrefix": strings.HasPrefix,
-		"pickID": func(l string) string {
-			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
-		},
-	}
-	t, err := template.New("commit.html").Funcs(fmap).ParseFiles("commit.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(w, info)
+	err = commitTmpl.Execute(w, info)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -716,13 +738,6 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	fmap := template.FuncMap{
-		"reprTrees": reprTrees,
-	}
-	tmpl, err := template.New("tree.html").Funcs(fmap).ParseFiles("tree.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
 	info := struct {
 		Repo    string
 		TopTree *Tree
@@ -730,7 +745,7 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo:    repo,
 		TopTree: top,
 	}
-	tmpl.Execute(w, info)
+	treeTmpl.Execute(w, info)
 }
 
 // treeEl holds information to draw each tree element.
@@ -768,10 +783,6 @@ func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	t, err := template.ParseFiles("blob.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
 	info := struct {
 		Repo    string
 		Content string
@@ -779,7 +790,7 @@ func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo:    repo,
 		Content: string(c),
 	}
-	t.Execute(w, info)
+	blobTmpl.Execute(w, info)
 }
 
 func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
@@ -804,11 +815,7 @@ func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo: repo,
 		Logs: logs,
 	}
-	t, err := template.ParseFiles("log.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(w, info)
+	err = logTmpl.Execute(w, info)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -828,23 +835,7 @@ func serveReviews(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Repo:    repo,
 		Reviews: listReviews(repo, 50),
 	}
-	fmap := template.FuncMap{
-		"color": func(status string) string {
-			switch status {
-			case "merged":
-				return "blue"
-			case "closed":
-				return "gray"
-			default:
-				return "black"
-			}
-		},
-	}
-	t, err := template.New("reviews.html").Funcs(fmap).ParseFiles("reviews.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(w, info)
+	err := reviewsTmpl.Execute(w, info)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -918,11 +909,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 			Repo:   repo,
 			Branch: b,
 		}
-		t, err := template.ParseFiles("review_init.html", "head.html", "top.html")
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = t.Execute(w, info)
+		err = reviewInitTmpl.Execute(w, info)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -974,17 +961,7 @@ func serveReview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		Commits:      commits,
 		DiffLines:    diffLines,
 	}
-	fmap := template.FuncMap{
-		"hasPrefix": strings.HasPrefix,
-		"pickID": func(l string) string {
-			return strings.TrimRight(strings.Split(l, " ")[1], "\n")
-		},
-	}
-	t, err := template.New("review.html").Funcs(fmap).ParseFiles("review.html", "head.html", "top.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(w, info)
+	err = reviewTmpl.Execute(w, info)
 	if err != nil {
 		log.Fatal(err)
 	}
