@@ -93,7 +93,7 @@ func commitTree(repo, c string) (string, error) {
 
 // gitTree returns parsed *Tree object of given tree id.
 // the *Tree object contains all the child data.
-func gitTree(repo, t string) (*Tree, error) {
+func gitTree(repo, t string, maxdepth int) (*Tree, error) {
 	cmd := exec.Command("git", "cat-file", "-t", t)
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
@@ -103,11 +103,15 @@ func gitTree(repo, t string) (*Tree, error) {
 	if string(out) != "tree\n" {
 		return nil, fmt.Errorf("%v is not a tree id of %v", t, repo)
 	}
-	return parseTree(repo, t, ""), nil
+	return parseTree(repo, t, "", 1, maxdepth), nil
 }
 
-// parseTree parses tree hierarchy with given id and return a top tree.
-func parseTree(repo, id string, name string) *Tree {
+// parseTree parses tree hierarchy with given tree id until reaches the max depth
+// If the maxdepth is negative number, it will parse all the tree.
+// It will return results with a top tree.
+//
+// TODO: what is proper procedure if the maxdepth is 0?
+func parseTree(repo, id string, name string, curdepth, maxdepth int) *Tree {
 	top := &Tree{Repo: repo, Id: id, Name: name}
 
 	cmd := exec.Command("git", "cat-file", "-p", string(id))
@@ -130,7 +134,9 @@ func parseTree(repo, id string, name string) *Tree {
 		cid := cinfos[2]
 		cname := ll[1]
 		if ctype == "tree" {
-			top.Trees = append(top.Trees, parseTree(repo, cid, cname))
+			if maxdepth < 0 || curdepth < maxdepth {
+				top.Trees = append(top.Trees, parseTree(repo, cid, cname, curdepth+1, maxdepth))
+			}
 		} else {
 			top.Blobs = append(top.Blobs, &Blob{Repo: repo, Id: cid, Name: cname})
 		}

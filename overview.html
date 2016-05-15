@@ -4,17 +4,11 @@
 <body>
 {{template "top.html" .}}
 <div style="font-size:20px">Branches: {{range .Branches}}{{.}} {{end}}</div><br>
-<div style="font-size:20px"><a href="/{{$.Repo}}/reviews/">Reviews</a></div><br>
-<div style="font-size:20px"><a href="/{{$.Repo}}/log/">Total {{.NCommits}} Commits</a></div></br>
-<div style="font-size:20px">Recent Commits</div>
-<div style="margin-left:10px">
-	{{range .RecentCommits}}
-	<div>
-		<a href="/{{$.Repo}}/commit/{{.ID}}">{{.Title}}</a>
-	</div>
-	{{end}}
+<div style="font-size:20px">
+	<a href="/{{$.Repo}}/tree/">Files</a> | 
+	<a href="/{{$.Repo}}/log/">Commits</a> | 
+	<a href="/{{$.Repo}}/reviews/">Reviews</a>
 </div><br>
-<div style="font-size:20px"><a href="/{{$.Repo}}/tree/">{{.NFiles}} Files</a></div><br><br>
 
 {{if not .HasReadme}}
 	<div style="font-size:20px; margin-bottom:10px;">{{.Repo}} repository don't have README file</div>

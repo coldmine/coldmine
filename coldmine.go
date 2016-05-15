@@ -594,53 +594,18 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		branches = append(branches, strings.Trim(l, " \r"))
 	}
 
-	cmd = exec.Command("git", "rev-list", "--count", "master")
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	nc := string(out)
-	nc = nc[:len(nc)-1]
-	nCommits, err := strconv.Atoi(nc)
-	if err != nil {
-		log.Print(err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	cmd = exec.Command("git", "log", "--pretty=oneline", "-10", "master")
-	cmd.Dir = filepath.Join(repoRoot, repo)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("(%v) %s", err, out)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	recentCommits := make([]commitEl, 0, 10)
-	for _, c := range strings.Split(string(out), "\n") {
-		if c == "" {
-			break
-		}
-		cc := strings.SplitN(c, " ", 2)
-		recentCommits = append(recentCommits, commitEl{ID: cc[0], Title: cc[1]})
-	}
-
 	tid, err := commitTree(repo, "master")
 	if err != nil {
 		log.Print(err)
 		http.NotFound(w, r)
 		return
 	}
-	top, err := gitTree(repo, tid)
+	top, err := gitTree(repo, tid, 1)
 	if err != nil {
 		log.Print(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	nFiles := nFilesInTree(top)
 
 	hasReadme := false
 	readme := ""
@@ -658,21 +623,15 @@ func serveOverview(w http.ResponseWriter, r *http.Request, repo, pth string) {
 	}
 
 	info := struct {
-		Repo          string
-		Branches      []string
-		NCommits      int
-		RecentCommits []commitEl
-		NFiles        int
-		HasReadme     bool
-		Readme        string
+		Repo      string
+		Branches  []string
+		HasReadme bool
+		Readme    string
 	}{
-		Repo:          repo,
-		Branches:      branches,
-		NCommits:      nCommits,
-		RecentCommits: recentCommits,
-		NFiles:        nFiles,
-		HasReadme:     hasReadme,
-		Readme:        readme,
+		Repo:      repo,
+		Branches:  branches,
+		HasReadme: hasReadme,
+		Readme:    readme,
 	}
 	err = overviewTmpl.Execute(w, info)
 	if err != nil {
@@ -732,7 +691,7 @@ func serveTree(w http.ResponseWriter, r *http.Request, repo, pth string) {
 		}
 		tid = t
 	}
-	top, err := gitTree(repo, tid)
+	top, err := gitTree(repo, tid, -1)
 	if err != nil {
 		log.Print(err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
