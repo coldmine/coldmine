@@ -99,6 +99,7 @@ func main() {
 		log.Print(g)
 	}
 	http.HandleFunc("/", rootHandler)
+	log.Printf("binding to %v", ipAddr)
 	log.Fatal(http.ListenAndServe(ipAddr, nil))
 }
 
