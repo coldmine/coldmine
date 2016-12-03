@@ -4,8 +4,24 @@
 <body>
 {{template "top.html" .}}
 <pre>
-{{range .Logs -}}<div style="display:inline-block; height:28px;"><span style="color:#444444">{{printf "%14s" .Date}}</span> <a href="/{{$.Repo}}/commit/{{.ID}}">{{.Subject}}</a></div>
+{{range .Logs -}}<div style="display:inline-block; height:28px;"><span style="color:#444444">{{printf "%11s" .Date}}</span> <a href="/{{$.Repo}}/commit/{{.ID}}">{{.Subject}}</a></div>
 {{end}}
 </pre>
+<div style="text-align:center">
+	<div style="margin:15px">
+		{{if ne .Prev -1 -}}
+			<a href="./{{print .Prev}}"><< newer</a>
+		{{- else -}}
+			<span style="color:#333333"><< newer</span>
+		{{- end}}
+		<span>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</span>
+		{{if ne .Next -1 -}}
+			<a href="./{{print .Next}}">older >></a>
+		{{- else -}}
+			<span style="color:#333333">older >></span>
+		{{- end}}
+	</div>
+</div>
+
 </body>
 </html>
