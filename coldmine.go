@@ -754,26 +754,85 @@ func serveBlob(w http.ResponseWriter, r *http.Request, repo, pth string) {
 }
 
 func serveLog(w http.ResponseWriter, r *http.Request, repo, pth string) {
-	cmd := exec.Command("git", "log", "--pretty=format:%H%n%ar%n%s%n")
+	pp := strings.Split(r.URL.Path, "/")
+	page, err := strconv.Atoi(pp[len(pp)-1])
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+	if page < 1 {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+
+	// how many commits in the repo?
+	cmd := exec.Command("git", "rev-list", "--count", "master")
 	cmd.Dir = filepath.Join(repoRoot, repo)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Print("%v: (%v) %s", cmd, err, out)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	nc := string(out)
+	nc = nc[:len(nc)-1]
+	nCommits, err := strconv.Atoi(nc)
+	if err != nil {
 		log.Print(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if nCommits == 0 {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+
+	// A page contains 15 commits.
+	commitPerPage := 15
+
+	// Check page infos.
+	lastPage := ((nCommits - 1) / commitPerPage) + 1
+	if page > lastPage {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+
+	prevPage := page - 1
+	if page == 1 {
+		prevPage = -1 // The page not exist.
+	}
+	nextPage := page + 1
+	if page == lastPage {
+		nextPage = -1 // The page not exist.
+	}
+
+	argSkip := fmt.Sprintf("--skip=%d", commitPerPage*(page-1))
+	argMaxCount := fmt.Sprintf("--max-count=%d", commitPerPage)
+	cmd = exec.Command("git", "log", argSkip, argMaxCount, "--pretty=format:%H%n%ar%n%s%n")
+	cmd.Dir = filepath.Join(repoRoot, repo)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Print("%v: (%v) %s", cmd, err, out)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	logs := make([]logEl, 0)
 	for _, c := range strings.Split(string(out), "\n\n") {
 		cc := strings.Split(c, "\n")
-		simpleDate := strings.Join(strings.Split(strings.Replace(cc[1], ",", "", -1), " ")[:2], " ") + " ago"
+		simpleDate := strings.Join(strings.Split(strings.Replace(cc[1], ",", "", -1), " ")[:2], " ")
 		logs = append(logs, logEl{ID: cc[0], Date: simpleDate, Subject: cc[2]})
 	}
+
 	info := struct {
 		Repo string
 		Logs []logEl
+		Prev int
+		Next int
 	}{
 		Repo: repo,
 		Logs: logs,
+		Prev: prevPage,
+		Next: nextPage,
 	}
 	err = logTmpl.Execute(w, info)
 	if err != nil {
